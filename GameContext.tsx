@@ -1,12 +1,10 @@
 'use client'
 
-import { GameProvider } from '@/components/game/GameContext'
-import { GameWrapper } from '@/components/game/GameWrapper'
-
 export default function Home() {
   return (
-    <GameProvider>
-      <GameWrapper />
-    </GameProvider>
+    <div>
+      <h1>Brawl Blitz</h1>
+      <p>Your game will load here.</p>
+    </div>
   )
 }
