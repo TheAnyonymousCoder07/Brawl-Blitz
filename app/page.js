@@ -1,8 +1,10 @@
+'use client'
+
 export default function Page() {
   return (
-    <div>
+    <main>
       <h1>Brawl Blitz</h1>
       <p>Game loading...</p>
-    </div>
-  );
+    </main>
+  )
 }
