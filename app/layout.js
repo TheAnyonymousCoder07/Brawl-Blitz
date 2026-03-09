@@ -1,7 +1,9 @@
 export default function RootLayout({ children }) {
   return (
-    <html>
-      <body>{children}</body>
+    <html lang="en">
+      <body>
+        {children}
+      </body>
     </html>
   )
 }
