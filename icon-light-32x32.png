@@ -1,0 +1,119 @@
+// Game Mode Definitions for Brawl Blitz - 4 Competitive Modes
+
+export interface GameModeDefinition {
+  id: string
+  name: string
+  description: string
+  icon: string
+  teamBased: boolean
+  maxPlayers: number
+  duration: number // in seconds
+  rules: string[]
+  winCondition: string
+  scoringSystem: {
+    killPoints: number
+    objectivePoints: number
+    winBonus: number
+  }
+}
+
+export const GAME_MODES: GameModeDefinition[] = [
+  // 1. ENERGY CORE - Control the center
+  {
+    id: 'energy_core',
+    name: 'Energy Core',
+    description: 'Teams fight to control a central power core that generates points',
+    icon: '⚡',
+    teamBased: true,
+    maxPlayers: 6,
+    duration: 180,
+    rules: [
+      'Stand near the Energy Core to capture it',
+      'Your team earns points while controlling the core',
+      'First team to 100 points wins',
+      'The core can be contested by both teams'
+    ],
+    winCondition: 'First team to reach 100 points or highest score when time runs out',
+    scoringSystem: {
+      killPoints: 1,
+      objectivePoints: 2,
+      winBonus: 50
+    }
+  },
+
+  // 2. CRYSTAL RUSH - Collect and hold crystals
+  {
+    id: 'crystal_rush',
+    name: 'Crystal Rush',
+    description: 'Crystals spawn in the center - collect and hold them to score',
+    icon: '💎',
+    teamBased: true,
+    maxPlayers: 6,
+    duration: 180,
+    rules: [
+      'Crystals spawn periodically in the center',
+      'Pick up crystals by walking over them',
+      'Hold crystals to earn points over time',
+      'Dropping below 0 health drops all your crystals',
+      'Return crystals to your base for bonus points'
+    ],
+    winCondition: 'Team with the most points when time runs out wins',
+    scoringSystem: {
+      killPoints: 2,
+      objectivePoints: 5,
+      winBonus: 50
+    }
+  },
+
+  // 3. SURVIVAL ARENA - Free for all last one standing
+  {
+    id: 'survival_arena',
+    name: 'Survival Arena',
+    description: 'Free-for-all battle royale - last player alive wins',
+    icon: '🏆',
+    teamBased: false,
+    maxPlayers: 8,
+    duration: 120,
+    rules: [
+      'Every player for themselves',
+      'No respawns - one life only',
+      'Arena shrinks over time',
+      'Power-ups spawn randomly',
+      'Last player standing wins'
+    ],
+    winCondition: 'Be the last player alive',
+    scoringSystem: {
+      killPoints: 10,
+      objectivePoints: 0,
+      winBonus: 100
+    }
+  },
+
+  // 4. PAYLOAD PUSH - Push the objective
+  {
+    id: 'payload_push',
+    name: 'Payload Push',
+    description: 'Push the payload to the enemy base while defending your own',
+    icon: '🚂',
+    teamBased: true,
+    maxPlayers: 6,
+    duration: 240,
+    rules: [
+      'Two payloads - one for each team',
+      'Stand near your payload to push it forward',
+      'Enemy players near the payload will stop it',
+      'First team to push their payload to the end wins',
+      'If time runs out, team with most progress wins'
+    ],
+    winCondition: 'Push your payload to the enemy base first',
+    scoringSystem: {
+      killPoints: 1,
+      objectivePoints: 3,
+      winBonus: 75
+    }
+  }
+]
+
+export const getGameModeById = (id: string): GameModeDefinition | undefined => {
+  return GAME_MODES.find(mode => mode.id === id)
+}

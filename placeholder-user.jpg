@@ -1,0 +1,170 @@
+// Game State Management for Brawl Blitz
+
+import { HeroDefinition } from '../heroes/heroDefinitions'
+import { MapDefinition } from '../maps/mapDefinitions'
+import { GameModeDefinition } from '../modes/gameModeDefinitions'
+import { PlayerStats } from '../progression/progressionSystem'
+
+export type GameScreen = 
+  | 'main_menu' 
+  | 'hero_select' 
+  | 'mode_select' 
+  | 'map_select'
+  | 'lobby'
+  | 'playing' 
+  | 'results'
+  | 'profile'
+  | 'shop'
+  | 'season_pass'
+
+export interface Player {
+  id: string
+  name: string
+  hero: HeroDefinition | null
+  team: 'blue' | 'red' | 'neutral'
+  health: number
+  maxHealth: number
+  x: number
+  y: number
+  velocityX: number
+  velocityY: number
+  rotation: number
+  score: number
+  kills: number
+  deaths: number
+  ultimateCharge: number
+  abilityCooldown: number
+  isAlive: boolean
+  isInGrass: boolean
+  effects: PlayerEffect[]
+  skin?: string
+}
+
+export interface PlayerEffect {
+  type: 'slow' | 'freeze' | 'burn' | 'poison' | 'shield' | 'speed' | 'invulnerable'
+  duration: number
+  startTime: number
+  value?: number
+}
+
+export interface Projectile {
+  id: string
+  ownerId: string
+  type: 'basic' | 'ability' | 'ultimate'
+  x: number
+  y: number
+  velocityX: number
+  velocityY: number
+  damage: number
+  range: number
+  distanceTraveled: number
+  color: number
+  size: number
+  effect?: string
+}
+
+export interface Objective {
+  id: string
+  type: 'core' | 'crystal' | 'payload'
+  x: number
+  y: number
+  team: 'blue' | 'red' | 'neutral'
+  progress: number
+  isContested: boolean
+}
+
+export interface GameMatch {
+  id: string
+  mode: GameModeDefinition
+  map: MapDefinition
+  players: Player[]
+  projectiles: Projectile[]
+  objectives: Objective[]
+  timeRemaining: number
+  isStarted: boolean
+  isEnded: boolean
+  blueScore: number
+  redScore: number
+  winner: 'blue' | 'red' | null
+}
+
+export interface MatchResult {
+  won: boolean
+  team: 'blue' | 'red' | 'neutral'
+  kills: number
+  deaths: number
+  damageDealt: number
+  healing: number
+  objectiveScore: number
+  mvp: boolean
+  coinsEarned: number
+  xpEarned: number
+  trophyChange: number
+}
+
+export interface GameState {
+  currentScreen: GameScreen
+  playerStats: PlayerStats
+  selectedHero: HeroDefinition | null
+  selectedMode: GameModeDefinition | null
+  selectedMap: MapDefinition | null
+  currentMatch: GameMatch | null
+  lastResult: MatchResult | null
+  unlockedHeroes: string[]
+  unlockedSkins: string[]
+  unlockedEmotes: string[]
+  settings: GameSettings
+  username: string
+  seasonTier: number
+  hasPremiumPass: boolean
+}
+
+export interface GameSettings {
+  musicVolume: number
+  sfxVolume: number
+  showFps: boolean
+  showDamageNumbers: boolean
+  screenShake: boolean
+  autoAim: boolean
+  controlScheme: 'keyboard' | 'touch'
+}
+
+// Initial unlocked heroes (6 starting heroes)
+export const STARTING_HEROES = ['striker', 'titan', 'aurora', 'blaze', 'frost', 'shadow']
+
+// Create initial game state
+export const createInitialGameState = (username: string = 'Player'): GameState => ({
+  currentScreen: 'main_menu',
+  playerStats: {
+    level: 1,
+    experience: 0,
+    coins: 100,
+    trophies: 0,
+    wins: 0,
+    losses: 0,
+    kills: 0,
+    deaths: 0,
+    gamesPlayed: 0,
+    favoriteHero: 'striker'
+  },
+  selectedHero: null,
+  selectedMode: null,
+  selectedMap: null,
+  currentMatch: null,
+  lastResult: null,
+  unlockedHeroes: [...STARTING_HEROES],
+  unlockedSkins: [],
+  unlockedEmotes: ['emote_thumbsup'],
+  settings: {
+    musicVolume: 0.7,
+    sfxVolume: 0.8,
+    showFps: false,
+    showDamageNumbers: true,
+    screenShake: true,
+    autoAim: false,
+    controlScheme: 'keyboard'
+  },
+  username,
+  seasonTier: 0,
+  hasPremiumPass: false
+})

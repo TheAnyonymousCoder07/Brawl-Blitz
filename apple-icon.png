@@ -1,0 +1,272 @@
+// Map Definitions for Brawl Blitz - 6 Competitive Arena Maps
+
+export interface MapObject {
+  type: 'wall' | 'grass' | 'destructible' | 'spawn' | 'objective'
+  x: number
+  y: number
+  width: number
+  height: number
+  color?: number
+  health?: number
+}
+
+export interface MapDefinition {
+  id: string
+  name: string
+  description: string
+  width: number
+  height: number
+  backgroundColor: number
+  objects: MapObject[]
+  spawnPoints: { team: 'blue' | 'red' | 'neutral', x: number, y: number }[]
+  objectivePositions?: { x: number, y: number }[]
+}
+
+export const MAPS: MapDefinition[] = [
+  // 1. BATTLE ARENA - Classic symmetrical map
+  {
+    id: 'battle_arena',
+    name: 'Battle Arena',
+    description: 'Classic symmetrical arena with balanced tactical options',
+    width: 1200,
+    height: 800,
+    backgroundColor: 0x2c3e50,
+    objects: [
+      // Top walls
+      { type: 'wall', x: 200, y: 100, width: 150, height: 30, color: 0x7f8c8d },
+      { type: 'wall', x: 850, y: 100, width: 150, height: 30, color: 0x7f8c8d },
+      // Bottom walls
+      { type: 'wall', x: 200, y: 670, width: 150, height: 30, color: 0x7f8c8d },
+      { type: 'wall', x: 850, y: 670, width: 150, height: 30, color: 0x7f8c8d },
+      // Center obstacles
+      { type: 'wall', x: 550, y: 350, width: 100, height: 100, color: 0x7f8c8d },
+      // Destructible barriers
+      { type: 'destructible', x: 400, y: 250, width: 60, height: 60, color: 0xc0392b, health: 100 },
+      { type: 'destructible', x: 740, y: 250, width: 60, height: 60, color: 0xc0392b, health: 100 },
+      { type: 'destructible', x: 400, y: 490, width: 60, height: 60, color: 0xc0392b, health: 100 },
+      { type: 'destructible', x: 740, y: 490, width: 60, height: 60, color: 0xc0392b, health: 100 },
+      // Grass zones
+      { type: 'grass', x: 100, y: 350, width: 80, height: 100, color: 0x27ae60 },
+      { type: 'grass', x: 1020, y: 350, width: 80, height: 100, color: 0x27ae60 },
+      { type: 'grass', x: 560, y: 150, width: 80, height: 80, color: 0x27ae60 },
+      { type: 'grass', x: 560, y: 570, width: 80, height: 80, color: 0x27ae60 }
+    ],
+    spawnPoints: [
+      { team: 'blue', x: 100, y: 400 },
+      { team: 'blue', x: 100, y: 300 },
+      { team: 'blue', x: 100, y: 500 },
+      { team: 'red', x: 1100, y: 400 },
+      { team: 'red', x: 1100, y: 300 },
+      { team: 'red', x: 1100, y: 500 }
+    ],
+    objectivePositions: [{ x: 600, y: 400 }]
+  },
+
+  // 2. CRYSTAL CAVES - Map with crystal formations
+  {
+    id: 'crystal_caves',
+    name: 'Crystal Caves',
+    description: 'Underground cavern filled with crystals and narrow passages',
+    width: 1200,
+    height: 800,
+    backgroundColor: 0x1a1a2e,
+    objects: [
+      // Crystal formations (walls)
+      { type: 'wall', x: 300, y: 200, width: 40, height: 120, color: 0x9b59b6 },
+      { type: 'wall', x: 860, y: 200, width: 40, height: 120, color: 0x9b59b6 },
+      { type: 'wall', x: 300, y: 480, width: 40, height: 120, color: 0x9b59b6 },
+      { type: 'wall', x: 860, y: 480, width: 40, height: 120, color: 0x9b59b6 },
+      // Center crystal cluster
+      { type: 'wall', x: 580, y: 380, width: 40, height: 40, color: 0xe74c3c },
+      { type: 'destructible', x: 520, y: 340, width: 30, height: 30, color: 0x3498db, health: 60 },
+      { type: 'destructible', x: 650, y: 340, width: 30, height: 30, color: 0x3498db, health: 60 },
+      { type: 'destructible', x: 520, y: 430, width: 30, height: 30, color: 0x3498db, health: 60 },
+      { type: 'destructible', x: 650, y: 430, width: 30, height: 30, color: 0x3498db, health: 60 },
+      // Side passages grass
+      { type: 'grass', x: 150, y: 200, width: 100, height: 150, color: 0x27ae60 },
+      { type: 'grass', x: 950, y: 200, width: 100, height: 150, color: 0x27ae60 },
+      { type: 'grass', x: 150, y: 450, width: 100, height: 150, color: 0x27ae60 },
+      { type: 'grass', x: 950, y: 450, width: 100, height: 150, color: 0x27ae60 }
+    ],
+    spawnPoints: [
+      { team: 'blue', x: 80, y: 400 },
+      { team: 'blue', x: 80, y: 280 },
+      { team: 'blue', x: 80, y: 520 },
+      { team: 'red', x: 1120, y: 400 },
+      { team: 'red', x: 1120, y: 280 },
+      { team: 'red', x: 1120, y: 520 }
+    ],
+    objectivePositions: [
+      { x: 400, y: 400 },
+      { x: 600, y: 400 },
+      { x: 800, y: 400 }
+    ]
+  },
+
+  // 3. FACTORY - Industrial map with conveyors
+  {
+    id: 'factory',
+    name: 'The Factory',
+    description: 'Industrial complex with machinery and tight corridors',
+    width: 1200,
+    height: 800,
+    backgroundColor: 0x34495e,
+    objects: [
+      // Conveyor belt structures
+      { type: 'wall', x: 200, y: 150, width: 200, height: 20, color: 0x95a5a6 },
+      { type: 'wall', x: 800, y: 150, width: 200, height: 20, color: 0x95a5a6 },
+      { type: 'wall', x: 200, y: 630, width: 200, height: 20, color: 0x95a5a6 },
+      { type: 'wall', x: 800, y: 630, width: 200, height: 20, color: 0x95a5a6 },
+      // Machinery (center)
+      { type: 'wall', x: 500, y: 300, width: 200, height: 200, color: 0x7f8c8d },
+      // Crates (destructible)
+      { type: 'destructible', x: 350, y: 350, width: 50, height: 50, color: 0xf39c12, health: 80 },
+      { type: 'destructible', x: 800, y: 350, width: 50, height: 50, color: 0xf39c12, health: 80 },
+      { type: 'destructible', x: 350, y: 450, width: 50, height: 50, color: 0xf39c12, health: 80 },
+      { type: 'destructible', x: 800, y: 450, width: 50, height: 50, color: 0xf39c12, health: 80 },
+      // Steam vents (grass for hiding)
+      { type: 'grass', x: 100, y: 300, width: 60, height: 200, color: 0x27ae60 },
+      { type: 'grass', x: 1040, y: 300, width: 60, height: 200, color: 0x27ae60 }
+    ],
+    spawnPoints: [
+      { team: 'blue', x: 100, y: 400 },
+      { team: 'blue', x: 100, y: 250 },
+      { team: 'blue', x: 100, y: 550 },
+      { team: 'red', x: 1100, y: 400 },
+      { team: 'red', x: 1100, y: 250 },
+      { team: 'red', x: 1100, y: 550 }
+    ],
+    objectivePositions: [{ x: 600, y: 400 }]
+  },
+
+  // 4. GARDEN - Nature themed with lots of grass
+  {
+    id: 'garden',
+    name: 'Mystic Garden',
+    description: 'Beautiful garden with abundant hiding spots and open areas',
+    width: 1200,
+    height: 800,
+    backgroundColor: 0x1e5631,
+    objects: [
+      // Tree trunks (walls)
+      { type: 'wall', x: 300, y: 300, width: 50, height: 50, color: 0x8b4513 },
+      { type: 'wall', x: 850, y: 300, width: 50, height: 50, color: 0x8b4513 },
+      { type: 'wall', x: 300, y: 450, width: 50, height: 50, color: 0x8b4513 },
+      { type: 'wall', x: 850, y: 450, width: 50, height: 50, color: 0x8b4513 },
+      { type: 'wall', x: 575, y: 375, width: 50, height: 50, color: 0x8b4513 },
+      // Flower beds (destructible)
+      { type: 'destructible', x: 450, y: 200, width: 100, height: 40, color: 0xe74c3c, health: 50 },
+      { type: 'destructible', x: 650, y: 200, width: 100, height: 40, color: 0xe74c3c, health: 50 },
+      { type: 'destructible', x: 450, y: 560, width: 100, height: 40, color: 0xe74c3c, health: 50 },
+      { type: 'destructible', x: 650, y: 560, width: 100, height: 40, color: 0xe74c3c, health: 50 },
+      // Bushes (grass zones)
+      { type: 'grass', x: 180, y: 180, width: 100, height: 100, color: 0x27ae60 },
+      { type: 'grass', x: 920, y: 180, width: 100, height: 100, color: 0x27ae60 },
+      { type: 'grass', x: 180, y: 520, width: 100, height: 100, color: 0x27ae60 },
+      { type: 'grass', x: 920, y: 520, width: 100, height: 100, color: 0x27ae60 },
+      { type: 'grass', x: 550, y: 100, width: 100, height: 80, color: 0x27ae60 },
+      { type: 'grass', x: 550, y: 620, width: 100, height: 80, color: 0x27ae60 }
+    ],
+    spawnPoints: [
+      { team: 'blue', x: 80, y: 400 },
+      { team: 'blue', x: 80, y: 250 },
+      { team: 'blue', x: 80, y: 550 },
+      { team: 'red', x: 1120, y: 400 },
+      { team: 'red', x: 1120, y: 250 },
+      { team: 'red', x: 1120, y: 550 }
+    ],
+    objectivePositions: [
+      { x: 400, y: 400 },
+      { x: 800, y: 400 }
+    ]
+  },
+
+  // 5. FORTRESS - Castle themed with corridors
+  {
+    id: 'fortress',
+    name: 'Ancient Fortress',
+    description: 'Medieval fortress with stone walls and strategic chokepoints',
+    width: 1200,
+    height: 800,
+    backgroundColor: 0x4a4a4a,
+    objects: [
+      // Castle walls
+      { type: 'wall', x: 250, y: 100, width: 30, height: 250, color: 0x636e72 },
+      { type: 'wall', x: 920, y: 100, width: 30, height: 250, color: 0x636e72 },
+      { type: 'wall', x: 250, y: 450, width: 30, height: 250, color: 0x636e72 },
+      { type: 'wall', x: 920, y: 450, width: 30, height: 250, color: 0x636e72 },
+      // Center throne room
+      { type: 'wall', x: 500, y: 300, width: 200, height: 30, color: 0x636e72 },
+      { type: 'wall', x: 500, y: 470, width: 200, height: 30, color: 0x636e72 },
+      { type: 'wall', x: 500, y: 330, width: 30, height: 140, color: 0x636e72 },
+      { type: 'wall', x: 670, y: 330, width: 30, height: 140, color: 0x636e72 },
+      // Barrels (destructible)
+      { type: 'destructible', x: 380, y: 250, width: 40, height: 40, color: 0x8b4513, health: 70 },
+      { type: 'destructible', x: 780, y: 250, width: 40, height: 40, color: 0x8b4513, health: 70 },
+      { type: 'destructible', x: 380, y: 510, width: 40, height: 40, color: 0x8b4513, health: 70 },
+      { type: 'destructible', x: 780, y: 510, width: 40, height: 40, color: 0x8b4513, health: 70 },
+      // Shadow corners (grass)
+      { type: 'grass', x: 50, y: 100, width: 80, height: 120, color: 0x27ae60 },
+      { type: 'grass', x: 1070, y: 100, width: 80, height: 120, color: 0x27ae60 },
+      { type: 'grass', x: 50, y: 580, width: 80, height: 120, color: 0x27ae60 },
+      { type: 'grass', x: 1070, y: 580, width: 80, height: 120, color: 0x27ae60 }
+    ],
+    spawnPoints: [
+      { team: 'blue', x: 100, y: 400 },
+      { team: 'blue', x: 100, y: 200 },
+      { team: 'blue', x: 100, y: 600 },
+      { team: 'red', x: 1100, y: 400 },
+      { team: 'red', x: 1100, y: 200 },
+      { team: 'red', x: 1100, y: 600 }
+    ],
+    objectivePositions: [{ x: 600, y: 400 }]
+  },
+
+  // 6. NEON CITY - Futuristic urban map
+  {
+    id: 'neon_city',
+    name: 'Neon City',
+    description: 'Futuristic cityscape with neon lights and urban combat',
+    width: 1200,
+    height: 800,
+    backgroundColor: 0x0f0f23,
+    objects: [
+      // Buildings (walls)
+      { type: 'wall', x: 200, y: 150, width: 100, height: 150, color: 0x2d3436 },
+      { type: 'wall', x: 900, y: 150, width: 100, height: 150, color: 0x2d3436 },
+      { type: 'wall', x: 200, y: 500, width: 100, height: 150, color: 0x2d3436 },
+      { type: 'wall', x: 900, y: 500, width: 100, height: 150, color: 0x2d3436 },
+      // Center plaza
+      { type: 'wall', x: 550, y: 350, width: 100, height: 100, color: 0x6c5ce7 },
+      // Neon barriers (destructible)
+      { type: 'destructible', x: 400, y: 300, width: 50, height: 20, color: 0xe84393, health: 60 },
+      { type: 'destructible', x: 750, y: 300, width: 50, height: 20, color: 0xe84393, health: 60 },
+      { type: 'destructible', x: 400, y: 480, width: 50, height: 20, color: 0xe84393, health: 60 },
+      { type: 'destructible', x: 750, y: 480, width: 50, height: 20, color: 0xe84393, health: 60 },
+      // Dark alleys (grass)
+      { type: 'grass', x: 80, y: 350, width: 60, height: 100, color: 0x27ae60 },
+      { type: 'grass', x: 1060, y: 350, width: 60, height: 100, color: 0x27ae60 },
+      { type: 'grass', x: 400, y: 150, width: 80, height: 60, color: 0x27ae60 },
+      { type: 'grass', x: 720, y: 150, width: 80, height: 60, color: 0x27ae60 },
+      { type: 'grass', x: 400, y: 590, width: 80, height: 60, color: 0x27ae60 },
+      { type: 'grass', x: 720, y: 590, width: 80, height: 60, color: 0x27ae60 }
+    ],
+    spawnPoints: [
+      { team: 'blue', x: 80, y: 400 },
+      { team: 'blue', x: 80, y: 250 },
+      { team: 'blue', x: 80, y: 550 },
+      { team: 'red', x: 1120, y: 400 },
+      { team: 'red', x: 1120, y: 250 },
+      { team: 'red', x: 1120, y: 550 }
+    ],
+    objectivePositions: [
+      { x: 300, y: 400 },
+      { x: 600, y: 400 },
+      { x: 900, y: 400 }
+    ]
+  }
+]
+
+export const getMapById = (id: string): MapDefinition | undefined => {
+  return MAPS.find(map => map.id === id)
+}

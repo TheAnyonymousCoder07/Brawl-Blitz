@@ -1,0 +1,197 @@
+// Progression System for Brawl Blitz
+
+export interface PlayerStats {
+  level: number
+  experience: number
+  coins: number
+  trophies: number
+  wins: number
+  losses: number
+  kills: number
+  deaths: number
+  gamesPlayed: number
+  favoriteHero: string
+}
+
+export interface UnlockableItem {
+  id: string
+  type: 'hero' | 'skin' | 'emote' | 'effect'
+  name: string
+  description: string
+  heroId?: string
+  rarity: 'common' | 'rare' | 'epic' | 'legendary'
+  unlockCost: number
+  unlockLevel?: number
+  imageColor: number
+}
+
+export interface SeasonPass {
+  id: string
+  name: string
+  theme: string
+  startDate: string
+  endDate: string
+  maxTier: number
+  freeRewards: SeasonReward[]
+  premiumRewards: SeasonReward[]
+}
+
+export interface SeasonReward {
+  tier: number
+  type: 'coins' | 'skin' | 'emote' | 'hero' | 'effect' | 'experience'
+  itemId?: string
+  amount?: number
+  name: string
+  rarity?: 'common' | 'rare' | 'epic' | 'legendary'
+}
+
+// XP required for each level
+export const LEVEL_XP_REQUIREMENTS: number[] = [
+  0, 100, 250, 450, 700, 1000, 1350, 1750, 2200, 2700, // 1-10
+  3250, 3850, 4500, 5200, 5950, 6750, 7600, 8500, 9450, 10450, // 11-20
+  11500, 12600, 13750, 14950, 16200, 17500, 18850, 20250, 21700, 23200, // 21-30
+  24750, 26350, 28000, 29700, 31450, 33250, 35100, 37000, 38950, 40950 // 31-40
+]
+
+// Hero skins
+export const HERO_SKINS: UnlockableItem[] = [
+  // Titan skins
+  { id: 'titan_golden', type: 'skin', name: 'Golden Titan', description: 'Shimmering gold armor', heroId: 'titan', rarity: 'epic', unlockCost: 500, imageColor: 0xffd700 },
+  { id: 'titan_dark', type: 'skin', name: 'Dark Knight', description: 'Shadowy black armor', heroId: 'titan', rarity: 'rare', unlockCost: 200, imageColor: 0x1a1a1a },
+  
+  // Viper skins
+  { id: 'viper_arctic', type: 'skin', name: 'Arctic Viper', description: 'Frozen sniper elite', heroId: 'viper', rarity: 'epic', unlockCost: 500, imageColor: 0x74b9ff },
+  { id: 'viper_crimson', type: 'skin', name: 'Crimson Shot', description: 'Blood red marksman', heroId: 'viper', rarity: 'rare', unlockCost: 200, imageColor: 0xc0392b },
+
+  // Shadow skins
+  { id: 'shadow_neon', type: 'skin', name: 'Neon Shadow', description: 'Glowing cyberpunk assassin', heroId: 'shadow', rarity: 'legendary', unlockCost: 1000, imageColor: 0xe84393 },
+  { id: 'shadow_ghost', type: 'skin', name: 'Ghost Blade', description: 'Spectral assassin', heroId: 'shadow', rarity: 'epic', unlockCost: 500, imageColor: 0xdfe6e9 },
+
+  // Aurora skins
+  { id: 'aurora_celestial', type: 'skin', name: 'Celestial Aurora', description: 'Divine healer from the stars', heroId: 'aurora', rarity: 'legendary', unlockCost: 1000, imageColor: 0xffeaa7 },
+  { id: 'aurora_nature', type: 'skin', name: 'Nature\'s Touch', description: 'Forest spirit healer', heroId: 'aurora', rarity: 'rare', unlockCost: 200, imageColor: 0x00b894 },
+
+  // Blaze skins
+  { id: 'blaze_infernal', type: 'skin', name: 'Infernal Blaze', description: 'Hellfire explosives expert', heroId: 'blaze', rarity: 'epic', unlockCost: 500, imageColor: 0xd63031 },
+  { id: 'blaze_solar', type: 'skin', name: 'Solar Flare', description: 'Sun-powered destruction', heroId: 'blaze', rarity: 'legendary', unlockCost: 1000, imageColor: 0xfdcb6e },
+
+  // Frost skins
+  { id: 'frost_glacier', type: 'skin', name: 'Glacier King', description: 'Ancient ice ruler', heroId: 'frost', rarity: 'epic', unlockCost: 500, imageColor: 0x0984e3 },
+  { id: 'frost_crystal', type: 'skin', name: 'Crystal Frost', description: 'Prismatic ice mage', heroId: 'frost', rarity: 'rare', unlockCost: 200, imageColor: 0xa29bfe },
+
+  // Striker skins
+  { id: 'striker_elite', type: 'skin', name: 'Elite Striker', description: 'Special forces operative', heroId: 'striker', rarity: 'epic', unlockCost: 500, imageColor: 0x2d3436 },
+  { id: 'striker_champion', type: 'skin', name: 'Champion', description: 'Tournament winner', heroId: 'striker', rarity: 'legendary', unlockCost: 1000, imageColor: 0xffd700 }
+]
+
+// Emotes
+export const EMOTES: UnlockableItem[] = [
+  { id: 'emote_thumbsup', type: 'emote', name: 'Thumbs Up', description: 'Show approval', rarity: 'common', unlockCost: 50, imageColor: 0x2ed573 },
+  { id: 'emote_angry', type: 'emote', name: 'Angry', description: 'Express frustration', rarity: 'common', unlockCost: 50, imageColor: 0xff4757 },
+  { id: 'emote_laugh', type: 'emote', name: 'Laugh', description: 'Show amusement', rarity: 'common', unlockCost: 50, imageColor: 0xffa502 },
+  { id: 'emote_cry', type: 'emote', name: 'Cry', description: 'Show sadness', rarity: 'common', unlockCost: 50, imageColor: 0x3498db },
+  { id: 'emote_taunt', type: 'emote', name: 'Taunt', description: 'Taunt your enemies', rarity: 'rare', unlockCost: 150, imageColor: 0x9b59b6 },
+  { id: 'emote_dance', type: 'emote', name: 'Victory Dance', description: 'Celebrate with style', rarity: 'epic', unlockCost: 300, imageColor: 0xe84393 },
+  { id: 'emote_crown', type: 'emote', name: 'King Me', description: 'Assert dominance', rarity: 'legendary', unlockCost: 500, imageColor: 0xffd700 }
+]
+
+// Season Pass - Blitz Pass
+export const CURRENT_SEASON: SeasonPass = {
+  id: 'season_1',
+  name: 'Blitz Pass Season 1',
+  theme: 'Rise of Heroes',
+  startDate: '2024-01-01',
+  endDate: '2024-03-31',
+  maxTier: 50,
+  freeRewards: [
+    { tier: 1, type: 'coins', amount: 50, name: '50 Coins' },
+    { tier: 5, type: 'emote', itemId: 'emote_thumbsup', name: 'Thumbs Up Emote', rarity: 'common' },
+    { tier: 10, type: 'coins', amount: 100, name: '100 Coins' },
+    { tier: 15, type: 'experience', amount: 500, name: '500 XP' },
+    { tier: 20, type: 'skin', itemId: 'titan_dark', name: 'Dark Knight Titan', rarity: 'rare' },
+    { tier: 25, type: 'coins', amount: 200, name: '200 Coins' },
+    { tier: 30, type: 'emote', itemId: 'emote_taunt', name: 'Taunt Emote', rarity: 'rare' },
+    { tier: 35, type: 'experience', amount: 1000, name: '1000 XP' },
+    { tier: 40, type: 'coins', amount: 300, name: '300 Coins' },
+    { tier: 45, type: 'skin', itemId: 'frost_crystal', name: 'Crystal Frost', rarity: 'rare' },
+    { tier: 50, type: 'hero', itemId: 'surge', name: 'Unlock Surge', rarity: 'epic' }
+  ],
+  premiumRewards: [
+    { tier: 1, type: 'skin', itemId: 'striker_elite', name: 'Elite Striker', rarity: 'epic' },
+    { tier: 5, type: 'coins', amount: 200, name: '200 Coins' },
+    { tier: 10, type: 'emote', itemId: 'emote_dance', name: 'Victory Dance', rarity: 'epic' },
+    { tier: 15, type: 'skin', itemId: 'viper_arctic', name: 'Arctic Viper', rarity: 'epic' },
+    { tier: 20, type: 'coins', amount: 500, name: '500 Coins' },
+    { tier: 25, type: 'skin', itemId: 'shadow_neon', name: 'Neon Shadow', rarity: 'legendary' },
+    { tier: 30, type: 'experience', amount: 2000, name: '2000 XP' },
+    { tier: 35, type: 'skin', itemId: 'aurora_celestial', name: 'Celestial Aurora', rarity: 'legendary' },
+    { tier: 40, type: 'coins', amount: 1000, name: '1000 Coins' },
+    { tier: 45, type: 'skin', itemId: 'blaze_solar', name: 'Solar Flare', rarity: 'legendary' },
+    { tier: 50, type: 'skin', itemId: 'striker_champion', name: 'Champion Striker', rarity: 'legendary' }
+  ]
+}
+
+// Calculate level from XP
+export const calculateLevel = (experience: number): number => {
+  let level = 1
+  for (let i = 0; i < LEVEL_XP_REQUIREMENTS.length; i++) {
+    if (experience >= LEVEL_XP_REQUIREMENTS[i]) {
+      level = i + 1
+    } else {
+      break
+    }
+  }
+  return Math.min(level, 40)
+}
+
+// Calculate XP needed for next level
+export const xpToNextLevel = (experience: number): { current: number, needed: number } => {
+  const level = calculateLevel(experience)
+  if (level >= 40) return { current: 0, needed: 0 }
+  
+  const currentLevelXp = LEVEL_XP_REQUIREMENTS[level - 1]
+  const nextLevelXp = LEVEL_XP_REQUIREMENTS[level]
+  
+  return {
+    current: experience - currentLevelXp,
+    needed: nextLevelXp - currentLevelXp
+  }
+}
+
+// Match rewards
+export const calculateMatchRewards = (
+  won: boolean,
+  kills: number,
+  deaths: number,
+  objectiveScore: number,
+  gameMode: string
+): { coins: number, experience: number, trophies: number } => {
+  const baseXp = won ? 50 : 25
+  const killXp = kills * 10
+  const objectiveXp = objectiveScore * 5
+  
+  const baseCoins = won ? 30 : 15
+  const killCoins = kills * 5
+  
+  const trophyChange = won ? Math.max(5, 10 - deaths) : Math.max(-10, -5 - deaths)
+  
+  return {
+    coins: baseCoins + killCoins,
+    experience: baseXp + killXp + objectiveXp,
+    trophies: trophyChange
+  }
+}
+
+// Initial player stats
+export const createInitialPlayerStats = (): PlayerStats => ({
+  level: 1,
+  experience: 0,
+  coins: 100,
+  trophies: 0,
+  wins: 0,
+  losses: 0,
+  kills: 0,
+  deaths: 0,
+  gamesPlayed: 0,
+  favoriteHero: 'striker'
+})

@@ -1,0 +1,1189 @@
+// Phaser Game Engine for Brawl Blitz
+
+import * as Phaser from 'phaser'
+import { GAME_CONFIG } from '../config/gameConfig'
+import { HeroDefinition, HEROES } from '../heroes/heroDefinitions'
+import { MapDefinition } from '../maps/mapDefinitions'
+import { GameModeDefinition } from '../modes/gameModeDefinitions'
+
+interface PlayerSprite extends Phaser.Physics.Arcade.Sprite {
+  playerId: string
+  heroData: HeroDefinition
+  health: number
+  maxHealth: number
+  team: 'blue' | 'red'
+  ultimateCharge: number
+  abilityCooldown: number
+  lastAttackTime: number
+  isInGrass: boolean
+  kills: number
+  deaths: number
+  healthBar?: Phaser.GameObjects.Graphics
+  effects: Map<string, number>
+}
+
+interface ProjectileSprite extends Phaser.Physics.Arcade.Sprite {
+  ownerId: string
+  damage: number
+  maxRange: number
+  distanceTraveled: number
+  startX: number
+  startY: number
+  effect?: string
+}
+
+export class GameScene extends Phaser.Scene {
+  private player!: PlayerSprite
+  private enemies: Map<string, PlayerSprite> = new Map()
+  private allies: Map<string, PlayerSprite> = new Map()
+  private projectiles!: Phaser.Physics.Arcade.Group
+  private walls!: Phaser.Physics.Arcade.StaticGroup
+  private grassZones!: Phaser.Physics.Arcade.StaticGroup
+  private destructibles!: Phaser.Physics.Arcade.Group
+  private objectives!: Phaser.Physics.Arcade.Group
+  
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys
+  private wasd!: { W: Phaser.Input.Keyboard.Key, A: Phaser.Input.Keyboard.Key, S: Phaser.Input.Keyboard.Key, D: Phaser.Input.Keyboard.Key }
+  private spaceKey!: Phaser.Input.Keyboard.Key
+  private eKey!: Phaser.Input.Keyboard.Key
+  
+  private mapData!: MapDefinition
+  private modeData!: GameModeDefinition
+  private heroData!: HeroDefinition
+  private team: 'blue' | 'red' = 'blue'
+  
+  private matchTime: number = 180
+  private blueScore: number = 0
+  private redScore: number = 0
+  private isMatchEnded: boolean = false
+  
+  private particles!: Phaser.GameObjects.Particles.ParticleEmitter
+  private damageTexts: Phaser.GameObjects.Text[] = []
+  
+  private onScoreUpdate?: (blue: number, red: number) => void
+  private onTimeUpdate?: (time: number) => void
+  private onPlayerUpdate?: (health: number, maxHealth: number, ultimate: number, ability: number) => void
+  private onMatchEnd?: (result: { won: boolean, kills: number, deaths: number }) => void
+  private onKillFeed?: (killer: string, victim: string) => void
+  
+  private joystick?: { x: number, y: number }
+  private isMobile: boolean = false
+  
+  constructor() {
+    super({ key: 'GameScene' })
+  }
+  
+  init(data: { 
+    map: MapDefinition, 
+    mode: GameModeDefinition, 
+    hero: HeroDefinition,
+    team: 'blue' | 'red',
+    onScoreUpdate?: (blue: number, red: number) => void,
+    onTimeUpdate?: (time: number) => void,
+    onPlayerUpdate?: (health: number, maxHealth: number, ultimate: number, ability: number) => void,
+    onMatchEnd?: (result: { won: boolean, kills: number, deaths: number }) => void,
+    onKillFeed?: (killer: string, victim: string) => void,
+    isMobile?: boolean
+  }) {
+    this.mapData = data.map
+    this.modeData = data.mode
+    this.heroData = data.hero
+    this.team = data.team
+    this.onScoreUpdate = data.onScoreUpdate
+    this.onTimeUpdate = data.onTimeUpdate
+    this.onPlayerUpdate = data.onPlayerUpdate
+    this.onMatchEnd = data.onMatchEnd
+    this.onKillFeed = data.onKillFeed
+    this.isMobile = data.isMobile || false
+    this.matchTime = data.mode?.duration ?? 180
+    this.blueScore = 0
+    this.redScore = 0
+    this.isMatchEnded = false
+  }
+  
+  create() {
+    // Set world bounds
+    this.physics.world.setBounds(0, 0, this.mapData.width, this.mapData.height)
+    
+    // Set camera bounds
+    this.cameras.main.setBounds(0, 0, this.mapData.width, this.mapData.height)
+    this.cameras.main.setBackgroundColor(this.mapData.backgroundColor)
+    
+    // Create groups
+    this.walls = this.physics.add.staticGroup()
+    this.grassZones = this.physics.add.staticGroup()
+    this.destructibles = this.physics.add.group()
+    this.projectiles = this.physics.add.group()
+    this.objectives = this.physics.add.group()
+    
+    // Draw map objects
+    this.createMapObjects()
+    
+    // Create player
+    this.createPlayer()
+    
+    // Create AI enemies
+    this.createAIPlayers()
+    
+    // Create objectives based on game mode
+    this.createObjectives()
+    
+    // Setup input
+    this.setupInput()
+    
+    // Setup collisions
+    this.setupCollisions()
+    
+    // Setup timer
+    this.setupMatchTimer()
+    
+    // Create particle emitter
+    this.createParticleSystem()
+    
+    // Camera follow
+    this.cameras.main.startFollow(this.player, true, 0.1, 0.1)
+    this.cameras.main.setZoom(1)
+  }
+  
+  private createMapObjects() {
+    this.mapData.objects.forEach(obj => {
+      const graphics = this.add.graphics()
+      
+      if (obj.type === 'wall') {
+        graphics.fillStyle(obj.color || 0x7f8c8d, 1)
+        graphics.fillRect(obj.x, obj.y, obj.width, obj.height)
+        
+        const wallZone = this.add.zone(obj.x + obj.width/2, obj.y + obj.height/2, obj.width, obj.height)
+        this.physics.add.existing(wallZone, true)
+        this.walls.add(wallZone)
+      } else if (obj.type === 'grass') {
+        graphics.fillStyle(obj.color || 0x27ae60, 0.6)
+        graphics.fillRect(obj.x, obj.y, obj.width, obj.height)
+        
+        // Add grass pattern
+        graphics.fillStyle(0x2ecc71, 0.4)
+        for (let i = 0; i < 10; i++) {
+          const gx = obj.x + Math.random() * obj.width
+          const gy = obj.y + Math.random() * obj.height
+          graphics.fillCircle(gx, gy, 3)
+        }
+        
+        const grassZone = this.add.zone(obj.x + obj.width/2, obj.y + obj.height/2, obj.width, obj.height)
+        this.physics.add.existing(grassZone, true);
+        (grassZone as any).isGrass = true
+        this.grassZones.add(grassZone)
+      } else if (obj.type === 'destructible') {
+        const destGraphics = this.add.graphics()
+        destGraphics.fillStyle(obj.color || 0xc0392b, 1)
+        destGraphics.fillRect(-obj.width/2, -obj.height/2, obj.width, obj.height)
+        destGraphics.lineStyle(2, 0x000000, 0.3)
+        destGraphics.strokeRect(-obj.width/2, -obj.height/2, obj.width, obj.height)
+        
+        const texture = destGraphics.generateTexture('dest_' + obj.x + '_' + obj.y, obj.width, obj.height)
+        destGraphics.destroy()
+        
+        const destSprite = this.physics.add.sprite(obj.x + obj.width/2, obj.y + obj.height/2, 'dest_' + obj.x + '_' + obj.y) as any
+        destSprite.setImmovable(true)
+        destSprite.health = obj.health || 100
+        destSprite.maxHealth = obj.health || 100
+        this.destructibles.add(destSprite)
+      }
+    })
+  }
+  
+  private createPlayer() {
+    // Find spawn point for player's team
+    const spawnPoints = this.mapData.spawnPoints.filter(sp => sp.team === this.team)
+    const spawn = spawnPoints[0] || { x: 100, y: 400 }
+    
+    // Create player graphics
+    const playerGraphics = this.add.graphics()
+    this.drawHeroSprite(playerGraphics, this.heroData, this.team)
+    const texture = playerGraphics.generateTexture('player', 50, 50)
+    playerGraphics.destroy()
+    
+    this.player = this.physics.add.sprite(spawn.x, spawn.y, 'player') as PlayerSprite
+    this.player.setCollideWorldBounds(true)
+    this.player.setDrag(200)
+    
+    // Set player properties
+    this.player.playerId = 'player'
+    this.player.heroData = this.heroData
+    this.player.health = this.heroData.stats.health
+    this.player.maxHealth = this.heroData.stats.health
+    this.player.team = this.team
+    this.player.ultimateCharge = 0
+    this.player.abilityCooldown = 0
+    this.player.lastAttackTime = 0
+    this.player.isInGrass = false
+    this.player.kills = 0
+    this.player.deaths = 0
+    this.player.effects = new Map()
+    
+    // Create health bar
+    this.createHealthBar(this.player)
+  }
+  
+  private drawHeroSprite(graphics: Phaser.GameObjects.Graphics, hero: HeroDefinition, team: 'blue' | 'red') {
+    const teamColor = team === 'blue' ? 0x3498db : 0xe74c3c
+    
+    // Body
+    graphics.fillStyle(hero.color, 1)
+    graphics.fillCircle(25, 25, 20)
+    
+    // Team outline
+    graphics.lineStyle(3, teamColor, 1)
+    graphics.strokeCircle(25, 25, 20)
+    
+    // Direction indicator
+    graphics.fillStyle(0xffffff, 1)
+    graphics.fillTriangle(35, 25, 45, 20, 45, 30)
+  }
+  
+  private createHealthBar(sprite: PlayerSprite) {
+    const healthBar = this.add.graphics()
+    sprite.healthBar = healthBar
+    this.updateHealthBar(sprite)
+  }
+  
+  private updateHealthBar(sprite: PlayerSprite) {
+    if (!sprite.healthBar) return
+    
+    sprite.healthBar.clear()
+    
+    // Background
+    sprite.healthBar.fillStyle(0x000000, 0.5)
+    sprite.healthBar.fillRect(sprite.x - 25, sprite.y - 35, 50, 6)
+    
+    // Health
+    const healthPercent = sprite.health / sprite.maxHealth
+    const healthColor = healthPercent > 0.5 ? 0x2ed573 : healthPercent > 0.25 ? 0xffa502 : 0xff4757
+    sprite.healthBar.fillStyle(healthColor, 1)
+    sprite.healthBar.fillRect(sprite.x - 25, sprite.y - 35, 50 * healthPercent, 6)
+    
+    // Ultimate charge bar
+    if (sprite.ultimateCharge > 0) {
+      sprite.healthBar.fillStyle(0x9b59b6, 1)
+      sprite.healthBar.fillRect(sprite.x - 25, sprite.y - 28, 50 * (sprite.ultimateCharge / 100), 3)
+    }
+  }
+  
+  private createAIPlayers() {
+    const enemyTeam = this.team === 'blue' ? 'red' : 'blue'
+    const enemySpawns = this.mapData.spawnPoints.filter(sp => sp.team === enemyTeam)
+    const allySpawns = this.mapData.spawnPoints.filter(sp => sp.team === this.team).slice(1)
+    
+    // Create enemy AI
+    enemySpawns.forEach((spawn, index) => {
+      const heroIndex = (index + 3) % HEROES.length
+      this.createAIPlayer(spawn.x, spawn.y, HEROES[heroIndex], enemyTeam, `enemy_${index}`)
+    })
+    
+    // Create ally AI
+    allySpawns.forEach((spawn, index) => {
+      const heroIndex = (index + 6) % HEROES.length
+      this.createAIPlayer(spawn.x, spawn.y, HEROES[heroIndex], this.team, `ally_${index}`)
+    })
+  }
+  
+  private createAIPlayer(x: number, y: number, hero: HeroDefinition, team: 'blue' | 'red', id: string) {
+    const aiGraphics = this.add.graphics()
+    this.drawHeroSprite(aiGraphics, hero, team)
+    const texture = aiGraphics.generateTexture('ai_' + id, 50, 50)
+    aiGraphics.destroy()
+    
+    const ai = this.physics.add.sprite(x, y, 'ai_' + id) as PlayerSprite
+    ai.setCollideWorldBounds(true)
+    ai.setDrag(200)
+    
+    ai.playerId = id
+    ai.heroData = hero
+    ai.health = hero.stats.health
+    ai.maxHealth = hero.stats.health
+    ai.team = team
+    ai.ultimateCharge = 0
+    ai.abilityCooldown = 0
+    ai.lastAttackTime = 0
+    ai.isInGrass = false
+    ai.kills = 0
+    ai.deaths = 0
+    ai.effects = new Map()
+    
+    this.createHealthBar(ai)
+    
+    if (team === this.team) {
+      this.allies.set(id, ai)
+    } else {
+      this.enemies.set(id, ai)
+    }
+  }
+  
+  private createObjectives() {
+    if (!this.mapData.objectivePositions) return
+    
+    this.mapData.objectivePositions.forEach((pos, index) => {
+      const objGraphics = this.add.graphics()
+      
+      if (this.modeData.id === 'energy_core') {
+        // Energy core - glowing circle
+        objGraphics.fillStyle(0xffd700, 0.8)
+        objGraphics.fillCircle(30, 30, 25)
+        objGraphics.lineStyle(3, 0xffffff, 1)
+        objGraphics.strokeCircle(30, 30, 25)
+      } else if (this.modeData.id === 'crystal_rush') {
+        // Crystal
+        objGraphics.fillStyle(0x9b59b6, 1)
+        objGraphics.fillTriangle(30, 10, 10, 50, 50, 50)
+      } else {
+        // Generic objective marker
+        objGraphics.fillStyle(0xffd700, 1)
+        objGraphics.fillCircle(30, 30, 20)
+      }
+      
+      const texture = objGraphics.generateTexture('objective_' + index, 60, 60)
+      objGraphics.destroy()
+      
+      const objective = this.physics.add.sprite(pos.x, pos.y, 'objective_' + index) as any
+      objective.objectiveId = 'obj_' + index
+      objective.controllingTeam = 'neutral'
+      objective.captureProgress = 0
+      this.objectives.add(objective)
+    })
+  }
+  
+  private setupInput() {
+    if (this.input.keyboard) {
+      this.wasd = {
+        W: this.input.keyboard.addKey('W'),
+        A: this.input.keyboard.addKey('A'),
+        S: this.input.keyboard.addKey('S'),
+        D: this.input.keyboard.addKey('D')
+      }
+      this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE)
+      this.eKey = this.input.keyboard.addKey('E')
+    }
+    
+    // Mouse input for aiming and attacking
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      if (pointer.leftButtonDown()) {
+        this.playerAttack()
+      }
+    })
+  }
+  
+  private setupCollisions() {
+    // Player collisions with walls
+    this.physics.add.collider(this.player, this.walls)
+    this.physics.add.collider(this.player, this.destructibles)
+    
+    // Enemy collisions
+    this.enemies.forEach(enemy => {
+      this.physics.add.collider(enemy, this.walls)
+      this.physics.add.collider(enemy, this.destructibles)
+    })
+    
+    // Ally collisions
+    this.allies.forEach(ally => {
+      this.physics.add.collider(ally, this.walls)
+      this.physics.add.collider(ally, this.destructibles)
+    })
+    
+    // Projectile collisions
+    this.physics.add.overlap(this.projectiles, this.walls, this.onProjectileHitWall, undefined, this)
+    this.physics.add.overlap(this.projectiles, this.destructibles, this.onProjectileHitDestructible, undefined, this)
+  }
+  
+  private setupMatchTimer() {
+    this.time.addEvent({
+      delay: 1000,
+      callback: () => {
+        if (this.isMatchEnded) return
+        
+        this.matchTime--
+        this.onTimeUpdate?.(this.matchTime)
+        
+        // Update objective scoring
+        this.updateObjectives()
+        
+        if (this.matchTime <= 0) {
+          this.endMatch()
+        }
+      },
+      loop: true
+    })
+  }
+  
+  private createParticleSystem() {
+    // Create a simple particle texture
+    const particleGraphics = this.add.graphics()
+    particleGraphics.fillStyle(0xffffff, 1)
+    particleGraphics.fillCircle(4, 4, 4)
+    particleGraphics.generateTexture('particle', 8, 8)
+    particleGraphics.destroy()
+  }
+  
+  update(time: number, delta: number) {
+    if (this.isMatchEnded) return
+    
+    // Handle player movement
+    this.handlePlayerMovement()
+    
+    // Handle player rotation (aim towards mouse)
+    this.handlePlayerAim()
+    
+    // Handle abilities
+    this.handleAbilities()
+    
+    // Update AI
+    this.updateAI(delta)
+    
+    // Update projectiles
+    this.updateProjectiles()
+    
+    // Update health bars
+    this.updateHealthBar(this.player)
+    this.enemies.forEach(enemy => this.updateHealthBar(enemy))
+    this.allies.forEach(ally => this.updateHealthBar(ally))
+    
+    // Check grass zones
+    this.checkGrassZones()
+    
+    // Update player info callback
+    this.onPlayerUpdate?.(
+      this.player.health,
+      this.player.maxHealth,
+      this.player.ultimateCharge,
+      Math.max(0, this.player.abilityCooldown - time)
+    )
+    
+    // Clean up damage texts
+    this.cleanupDamageTexts()
+  }
+  
+  private handlePlayerMovement() {
+    const speed = this.player.heroData.stats.speed
+    let vx = 0
+    let vy = 0
+    
+    if (this.joystick) {
+      vx = this.joystick.x * speed
+      vy = this.joystick.y * speed
+    } else {
+      if (this.wasd.A.isDown) vx -= speed
+      if (this.wasd.D.isDown) vx += speed
+      if (this.wasd.W.isDown) vy -= speed
+      if (this.wasd.S.isDown) vy += speed
+    }
+    
+    // Apply slow effect
+    if (this.player.effects.has('slow')) {
+      vx *= 0.5
+      vy *= 0.5
+    }
+    
+    // Apply freeze effect
+    if (this.player.effects.has('freeze')) {
+      vx = 0
+      vy = 0
+    }
+    
+    // Apply speed boost
+    if (this.player.effects.has('speed')) {
+      vx *= 1.5
+      vy *= 1.5
+    }
+    
+    this.player.setVelocity(vx, vy)
+  }
+  
+  private handlePlayerAim() {
+    const pointer = this.input.activePointer
+    const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y)
+    const angle = Phaser.Math.Angle.Between(this.player.x, this.player.y, worldPoint.x, worldPoint.y)
+    this.player.setRotation(angle)
+  }
+  
+  private handleAbilities() {
+    const time = this.time.now
+    
+    // Ability (Space)
+    if (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+      if (time > this.player.abilityCooldown) {
+        this.useAbility()
+        this.player.abilityCooldown = time + this.player.heroData.ability.cooldown
+      }
+    }
+    
+    // Ultimate (E)
+    if (this.eKey && Phaser.Input.Keyboard.JustDown(this.eKey)) {
+      if (this.player.ultimateCharge >= 100) {
+        this.useUltimate()
+        this.player.ultimateCharge = 0
+      }
+    }
+  }
+  
+  private playerAttack() {
+    const time = this.time.now
+    const attackCooldown = this.player.heroData.basicAttack.cooldown
+    
+    if (time - this.player.lastAttackTime < attackCooldown) return
+    
+    this.player.lastAttackTime = time
+    
+    // Create projectile
+    this.createProjectile(
+      this.player,
+      this.player.heroData.basicAttack.damage || 20,
+      this.player.heroData.stats.attackRange,
+      this.player.heroData.color
+    )
+  }
+  
+  private createProjectile(owner: PlayerSprite, damage: number, range: number, color: number) {
+    const projGraphics = this.add.graphics()
+    projGraphics.fillStyle(color, 1)
+    projGraphics.fillCircle(6, 6, 6)
+    projGraphics.generateTexture('proj_' + owner.playerId + '_' + this.time.now, 12, 12)
+    projGraphics.destroy()
+    
+    const proj = this.physics.add.sprite(owner.x, owner.y, 'proj_' + owner.playerId + '_' + this.time.now) as ProjectileSprite
+    proj.ownerId = owner.playerId
+    proj.damage = damage
+    proj.maxRange = range
+    proj.distanceTraveled = 0
+    proj.startX = owner.x
+    proj.startY = owner.y
+    
+    const speed = 400
+    const vx = Math.cos(owner.rotation) * speed
+    const vy = Math.sin(owner.rotation) * speed
+    proj.setVelocity(vx, vy)
+    
+    this.projectiles.add(proj)
+  }
+  
+  private useAbility() {
+    const hero = this.player.heroData
+    const ability = hero.ability
+    
+    // Create visual effect based on ability
+    switch (ability.effect) {
+      case 'heal':
+        this.createHealEffect(this.player.x, this.player.y)
+        // Heal allies
+        this.allies.forEach(ally => {
+          const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, ally.x, ally.y)
+          if (dist < 150) {
+            ally.health = Math.min(ally.maxHealth, ally.health + 40)
+            this.showDamageNumber(ally.x, ally.y, 40, true)
+          }
+        })
+        this.player.health = Math.min(this.player.maxHealth, this.player.health + 40)
+        this.showDamageNumber(this.player.x, this.player.y, 40, true)
+        break
+        
+      case 'dash':
+        const dashDist = 200
+        this.player.x += Math.cos(this.player.rotation) * dashDist
+        this.player.y += Math.sin(this.player.rotation) * dashDist
+        this.createDashEffect(this.player.x, this.player.y)
+        break
+        
+      case 'shield':
+        this.player.effects.set('shield', this.time.now + (ability.duration || 3000))
+        this.createShieldEffect(this.player)
+        break
+        
+      case 'freeze':
+        this.enemies.forEach(enemy => {
+          const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y)
+          if (dist < 150) {
+            enemy.effects.set('freeze', this.time.now + (ability.duration || 1500))
+          }
+        })
+        this.createFreezeEffect(this.player.x, this.player.y)
+        break
+        
+      case 'speed':
+        this.player.effects.set('speed', this.time.now + (ability.duration || 3000))
+        break
+        
+      default:
+        // Area damage ability
+        if (ability.damage) {
+          this.enemies.forEach(enemy => {
+            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y)
+            if (dist < (ability.range || 150)) {
+              this.damageTarget(enemy, ability.damage!, this.player)
+            }
+          })
+          this.createExplosionEffect(this.player.x, this.player.y)
+        }
+    }
+  }
+  
+  private useUltimate() {
+    const hero = this.player.heroData
+    const ultimate = hero.ultimate
+    
+    switch (ultimate.effect) {
+      case 'mass_heal':
+        this.allies.forEach(ally => {
+          ally.health = ally.maxHealth
+          this.showDamageNumber(ally.x, ally.y, ally.maxHealth, true)
+        })
+        this.player.health = this.player.maxHealth
+        this.createMassHealEffect(this.player.x, this.player.y)
+        break
+        
+      case 'explosion':
+      case 'inferno':
+        this.enemies.forEach(enemy => {
+          const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y)
+          if (dist < 200) {
+            this.damageTarget(enemy, ultimate.damage || 80, this.player)
+          }
+        })
+        this.createMassExplosionEffect(this.player.x, this.player.y)
+        break
+        
+      case 'mass_freeze':
+        this.enemies.forEach(enemy => {
+          enemy.effects.set('freeze', this.time.now + (ultimate.duration || 3000))
+        })
+        this.createMassFreezeEffect(this.player.x, this.player.y)
+        break
+        
+      case 'stat_boost':
+        this.player.effects.set('speed', this.time.now + (ultimate.duration || 6000))
+        this.player.effects.set('damage_boost', this.time.now + (ultimate.duration || 6000))
+        break
+        
+      default:
+        // Damage all enemies in range
+        this.enemies.forEach(enemy => {
+          const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, enemy.x, enemy.y)
+          if (dist < (ultimate.range || 200)) {
+            this.damageTarget(enemy, ultimate.damage || 60, this.player)
+          }
+        })
+        this.createExplosionEffect(this.player.x, this.player.y)
+    }
+  }
+  
+  private createHealEffect(x: number, y: number) {
+    const circle = this.add.circle(x, y, 10, 0x2ed573, 0.8)
+    this.tweens.add({
+      targets: circle,
+      radius: 150,
+      alpha: 0,
+      duration: 500,
+      onComplete: () => circle.destroy()
+    })
+  }
+  
+  private createDashEffect(x: number, y: number) {
+    const trail = this.add.circle(x, y, 20, 0x9b59b6, 0.6)
+    this.tweens.add({
+      targets: trail,
+      alpha: 0,
+      scale: 2,
+      duration: 300,
+      onComplete: () => trail.destroy()
+    })
+  }
+  
+  private createShieldEffect(sprite: PlayerSprite) {
+    const shield = this.add.circle(sprite.x, sprite.y, 30, 0x3498db, 0.3)
+    shield.setStrokeStyle(3, 0x3498db, 1)
+    
+    const updateShield = () => {
+      if (sprite.effects.has('shield')) {
+        shield.setPosition(sprite.x, sprite.y)
+      } else {
+        shield.destroy()
+      }
+    }
+    
+    this.time.addEvent({
+      delay: 16,
+      callback: updateShield,
+      loop: true
+    })
+  }
+  
+  private createFreezeEffect(x: number, y: number) {
+    const frost = this.add.circle(x, y, 10, 0x74b9ff, 0.8)
+    this.tweens.add({
+      targets: frost,
+      radius: 150,
+      alpha: 0,
+      duration: 400,
+      onComplete: () => frost.destroy()
+    })
+  }
+  
+  private createExplosionEffect(x: number, y: number) {
+    const explosion = this.add.circle(x, y, 10, 0xff6b35, 0.9)
+    this.tweens.add({
+      targets: explosion,
+      radius: 100,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => explosion.destroy()
+    })
+  }
+  
+  private createMassHealEffect(x: number, y: number) {
+    for (let i = 0; i < 3; i++) {
+      this.time.delayedCall(i * 100, () => {
+        const ring = this.add.circle(x, y, 20 + i * 30, 0x2ed573, 0.6)
+        this.tweens.add({
+          targets: ring,
+          radius: 200,
+          alpha: 0,
+          duration: 600,
+          onComplete: () => ring.destroy()
+        })
+      })
+    }
+  }
+  
+  private createMassExplosionEffect(x: number, y: number) {
+    const colors = [0xff6b35, 0xff4757, 0xffd700]
+    colors.forEach((color, i) => {
+      this.time.delayedCall(i * 50, () => {
+        const explosion = this.add.circle(x, y, 20, color, 0.8)
+        this.tweens.add({
+          targets: explosion,
+          radius: 200,
+          alpha: 0,
+          duration: 400,
+          onComplete: () => explosion.destroy()
+        })
+      })
+    })
+  }
+  
+  private createMassFreezeEffect(x: number, y: number) {
+    const colors = [0x74b9ff, 0x0984e3, 0xffffff]
+    colors.forEach((color, i) => {
+      this.time.delayedCall(i * 80, () => {
+        const frost = this.add.circle(x, y, 30, color, 0.7)
+        this.tweens.add({
+          targets: frost,
+          radius: 250,
+          alpha: 0,
+          duration: 500,
+          onComplete: () => frost.destroy()
+        })
+      })
+    })
+  }
+  
+  private damageTarget(target: PlayerSprite, damage: number, attacker: PlayerSprite) {
+    // Check for shield
+    if (target.effects.has('shield')) {
+      damage *= 0.5
+    }
+    
+    // Check for damage boost
+    if (attacker.effects.has('damage_boost')) {
+      damage *= 1.3
+    }
+    
+    target.health -= damage
+    this.showDamageNumber(target.x, target.y, damage, false)
+    
+    // Charge ultimate for attacker
+    attacker.ultimateCharge = Math.min(100, attacker.ultimateCharge + damage * 0.3)
+    
+    if (target.health <= 0) {
+      this.handleKill(attacker, target)
+    }
+  }
+  
+  private showDamageNumber(x: number, y: number, amount: number, isHeal: boolean) {
+    const text = this.add.text(x, y - 30, (isHeal ? '+' : '-') + Math.round(amount), {
+      fontSize: '18px',
+      color: isHeal ? '#2ed573' : '#ff4757',
+      fontFamily: 'Arial',
+      fontStyle: 'bold'
+    })
+    text.setOrigin(0.5)
+    
+    this.tweens.add({
+      targets: text,
+      y: y - 60,
+      alpha: 0,
+      duration: 800,
+      onComplete: () => text.destroy()
+    })
+    
+    this.damageTexts.push(text)
+  }
+  
+  private cleanupDamageTexts() {
+    this.damageTexts = this.damageTexts.filter(text => text.active)
+  }
+  
+  private handleKill(killer: PlayerSprite, victim: PlayerSprite) {
+    killer.kills++
+    victim.deaths++
+    
+    // Update scores
+    if (killer.team === 'blue') {
+      this.blueScore += this.modeData.scoringSystem.killPoints
+    } else {
+      this.redScore += this.modeData.scoringSystem.killPoints
+    }
+    this.onScoreUpdate?.(this.blueScore, this.redScore)
+    
+    // Kill feed
+    this.onKillFeed?.(killer.heroData.name, victim.heroData.name)
+    
+    // Respawn after delay
+    this.time.delayedCall(3000, () => {
+      this.respawnPlayer(victim)
+    })
+    
+    // Hide victim temporarily
+    victim.setAlpha(0.3)
+    victim.health = 0
+  }
+  
+  private respawnPlayer(player: PlayerSprite) {
+    const spawnPoints = this.mapData.spawnPoints.filter(sp => sp.team === player.team)
+    const spawn = Phaser.Math.RND.pick(spawnPoints)
+    
+    player.setPosition(spawn.x, spawn.y)
+    player.health = player.maxHealth
+    player.setAlpha(1)
+    player.effects.clear()
+  }
+  
+  private updateAI(delta: number) {
+    const allPlayers = [this.player, ...Array.from(this.allies.values())]
+    
+    this.enemies.forEach(enemy => {
+      if (enemy.health <= 0) return
+      
+      // Find nearest target
+      let nearestTarget: PlayerSprite | null = null
+      let nearestDist = Infinity
+      
+      allPlayers.forEach(player => {
+        if (player.health <= 0) return
+        const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, player.x, player.y)
+        if (dist < nearestDist) {
+          nearestDist = dist
+          nearestTarget = player
+        }
+      })
+      
+      if (nearestTarget) {
+        // Move towards target
+        const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, nearestTarget.x, nearestTarget.y)
+        enemy.setRotation(angle)
+        
+        if (nearestDist > enemy.heroData.stats.attackRange * 0.8) {
+          const speed = enemy.heroData.stats.speed * 0.8
+          enemy.setVelocity(
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed
+          )
+        } else {
+          enemy.setVelocity(0, 0)
+          
+          // Attack
+          const time = this.time.now
+          if (time - enemy.lastAttackTime > enemy.heroData.basicAttack.cooldown) {
+            enemy.lastAttackTime = time
+            this.aiAttack(enemy, nearestTarget)
+          }
+        }
+      }
+    })
+    
+    // Update ally AI similarly
+    this.allies.forEach(ally => {
+      if (ally.health <= 0) return
+      
+      let nearestEnemy: PlayerSprite | null = null
+      let nearestDist = Infinity
+      
+      this.enemies.forEach(enemy => {
+        if (enemy.health <= 0) return
+        const dist = Phaser.Math.Distance.Between(ally.x, ally.y, enemy.x, enemy.y)
+        if (dist < nearestDist) {
+          nearestDist = dist
+          nearestEnemy = enemy
+        }
+      })
+      
+      if (nearestEnemy) {
+        const angle = Phaser.Math.Angle.Between(ally.x, ally.y, nearestEnemy.x, nearestEnemy.y)
+        ally.setRotation(angle)
+        
+        if (nearestDist > ally.heroData.stats.attackRange * 0.8) {
+          const speed = ally.heroData.stats.speed * 0.7
+          ally.setVelocity(
+            Math.cos(angle) * speed,
+            Math.sin(angle) * speed
+          )
+        } else {
+          ally.setVelocity(0, 0)
+          
+          const time = this.time.now
+          if (time - ally.lastAttackTime > ally.heroData.basicAttack.cooldown) {
+            ally.lastAttackTime = time
+            this.aiAttack(ally, nearestEnemy)
+          }
+        }
+      }
+    })
+  }
+  
+  private aiAttack(attacker: PlayerSprite, target: PlayerSprite) {
+    this.createProjectile(
+      attacker,
+      attacker.heroData.basicAttack.damage || 20,
+      attacker.heroData.stats.attackRange,
+      attacker.heroData.color
+    )
+  }
+  
+  private updateProjectiles() {
+    const projectilesToDestroy: ProjectileSprite[] = []
+    
+    this.projectiles.getChildren().forEach((child) => {
+      const proj = child as ProjectileSprite
+      
+      // Calculate distance traveled
+      proj.distanceTraveled = Phaser.Math.Distance.Between(
+        proj.startX, proj.startY, proj.x, proj.y
+      )
+      
+      // Destroy if traveled too far
+      if (proj.distanceTraveled > proj.maxRange) {
+        projectilesToDestroy.push(proj)
+        return
+      }
+      
+      // Check collision with players
+      const isPlayerProjectile = proj.ownerId === 'player' || proj.ownerId.startsWith('ally_')
+      
+      if (isPlayerProjectile) {
+        // Hit enemies
+        this.enemies.forEach(enemy => {
+          if (enemy.health <= 0) return
+          const dist = Phaser.Math.Distance.Between(proj.x, proj.y, enemy.x, enemy.y)
+          if (dist < 25) {
+            this.damageTarget(enemy, proj.damage, this.player)
+            projectilesToDestroy.push(proj)
+          }
+        })
+      } else {
+        // Hit player
+        const dist = Phaser.Math.Distance.Between(proj.x, proj.y, this.player.x, this.player.y)
+        if (dist < 25 && this.player.health > 0) {
+          const attacker = this.enemies.get(proj.ownerId)
+          if (attacker) {
+            this.damageTarget(this.player, proj.damage, attacker)
+          }
+          projectilesToDestroy.push(proj)
+        }
+        
+        // Hit allies
+        this.allies.forEach(ally => {
+          if (ally.health <= 0) return
+          const dist = Phaser.Math.Distance.Between(proj.x, proj.y, ally.x, ally.y)
+          if (dist < 25) {
+            const attacker = this.enemies.get(proj.ownerId)
+            if (attacker) {
+              this.damageTarget(ally, proj.damage, attacker)
+            }
+            projectilesToDestroy.push(proj)
+          }
+        })
+      }
+    })
+    
+    projectilesToDestroy.forEach(proj => proj.destroy())
+  }
+  
+  private onProjectileHitWall(projectile: Phaser.GameObjects.GameObject) {
+    projectile.destroy()
+  }
+  
+  private onProjectileHitDestructible(projectile: Phaser.GameObjects.GameObject, destructible: Phaser.GameObjects.GameObject) {
+    const proj = projectile as ProjectileSprite
+    const dest = destructible as any
+    
+    dest.health -= proj.damage
+    proj.destroy()
+    
+    if (dest.health <= 0) {
+      this.createExplosionEffect(dest.x, dest.y)
+      dest.destroy()
+    }
+  }
+  
+  private checkGrassZones() {
+    let playerInGrass = false
+    
+    this.grassZones.getChildren().forEach((zone) => {
+      const z = zone as Phaser.GameObjects.Zone
+      if (Phaser.Geom.Rectangle.Contains(z.getBounds(), this.player.x, this.player.y)) {
+        playerInGrass = true
+      }
+    })
+    
+    this.player.isInGrass = playerInGrass
+    this.player.setAlpha(playerInGrass ? 0.5 : 1)
+  }
+  
+  private updateObjectives() {
+    this.objectives.getChildren().forEach((child) => {
+      const obj = child as any
+      
+      // Check which team is near the objective
+      let blueNear = 0
+      let redNear = 0
+      
+      const checkRange = 100
+      
+      // Count player
+      const playerDist = Phaser.Math.Distance.Between(this.player.x, this.player.y, obj.x, obj.y)
+      if (playerDist < checkRange && this.player.health > 0) {
+        if (this.team === 'blue') blueNear++
+        else redNear++
+      }
+      
+      // Count allies
+      this.allies.forEach(ally => {
+        if (ally.health <= 0) return
+        const dist = Phaser.Math.Distance.Between(ally.x, ally.y, obj.x, obj.y)
+        if (dist < checkRange) {
+          if (ally.team === 'blue') blueNear++
+          else redNear++
+        }
+      })
+      
+      // Count enemies
+      this.enemies.forEach(enemy => {
+        if (enemy.health <= 0) return
+        const dist = Phaser.Math.Distance.Between(enemy.x, enemy.y, obj.x, obj.y)
+        if (dist < checkRange) {
+          if (enemy.team === 'blue') blueNear++
+          else redNear++
+        }
+      })
+      
+      // Update control
+      if (blueNear > redNear && redNear === 0) {
+        obj.controllingTeam = 'blue'
+        this.blueScore += this.modeData.scoringSystem.objectivePoints
+      } else if (redNear > blueNear && blueNear === 0) {
+        obj.controllingTeam = 'red'
+        this.redScore += this.modeData.scoringSystem.objectivePoints
+      }
+      
+      this.onScoreUpdate?.(this.blueScore, this.redScore)
+    })
+  }
+  
+  private endMatch() {
+    this.isMatchEnded = true
+    
+    const won = this.team === 'blue' ? this.blueScore > this.redScore : this.redScore > this.blueScore
+    
+    this.onMatchEnd?.({
+      won,
+      kills: this.player.kills,
+      deaths: this.player.deaths
+    })
+  }
+  
+  // Public methods for mobile controls
+  setJoystick(x: number, y: number) {
+    this.joystick = { x, y }
+  }
+  
+  clearJoystick() {
+    this.joystick = undefined
+  }
+  
+  triggerAttack() {
+    this.playerAttack()
+  }
+  
+  triggerAbility() {
+    if (this.time.now > this.player.abilityCooldown) {
+      this.useAbility()
+      this.player.abilityCooldown = this.time.now + this.player.heroData.ability.cooldown
+    }
+  }
+  
+  triggerUltimate() {
+    if (this.player.ultimateCharge >= 100) {
+      this.useUltimate()
+      this.player.ultimateCharge = 0
+    }
+  }
+}
+
+export const createPhaserGame = (
+  container: HTMLElement,
+  mapData: MapDefinition,
+  modeData: GameModeDefinition,
+  heroData: HeroDefinition,
+  team: 'blue' | 'red',
+  onScoreUpdate?: (blue: number, red: number) => void,
+  onTimeUpdate?: (time: number) => void,
+  onPlayerUpdate?: (health: number, maxHealth: number, ultimate: number, ability: number) => void,
+  onMatchEnd?: (result: { won: boolean, kills: number, deaths: number }) => void,
+  onKillFeed?: (killer: string, victim: string) => void,
+  isMobile: boolean = false
+) => {
+  const config: Phaser.Types.Core.GameConfig = {
+    type: Phaser.AUTO,
+    width: GAME_CONFIG.width,
+    height: GAME_CONFIG.height,
+    parent: container,
+    backgroundColor: GAME_CONFIG.backgroundColor,
+    physics: {
+      default: 'arcade',
+      arcade: {
+        gravity: GAME_CONFIG.physics.gravity,
+        debug: GAME_CONFIG.physics.debug
+      }
+    },
+    scene: GameScene,
+    scale: {
+      mode: Phaser.Scale.FIT,
+      autoCenter: Phaser.Scale.CENTER_BOTH
+    }
+  }
+  
+  const game = new Phaser.Game(config)
+  
+  game.events.on('ready', () => {
+    const scene = game.scene.getScene('GameScene') as GameScene
+    scene.scene.restart({
+      map: mapData,
+      mode: modeData,
+      hero: heroData,
+      team,
+      onScoreUpdate,
+      onTimeUpdate,
+      onPlayerUpdate,
+      onMatchEnd,
+      onKillFeed,
+      isMobile
+    })
+  })
+  
+  return game
+}
