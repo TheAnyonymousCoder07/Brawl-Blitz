@@ -1,9 +1,9 @@
 "use client"
 import { useEffect, useRef } from "react"
 
-export default function Game(){
+export default function GamePage(){
 
-const canvasRef = useRef()
+const canvasRef = useRef(null)
 
 useEffect(()=>{
 
@@ -13,167 +13,235 @@ const ctx = canvas.getContext("2d")
 canvas.width = window.innerWidth
 canvas.height = window.innerHeight
 
-/* ======================
-SPRITES
-====================== */
+/* =============================
+GAME STATE
+============================= */
 
-const playerImg = new Image()
-playerImg.src="/sprites/player.png"
+let frame = 0
+let score = 0
 
-const enemyImg = new Image()
-enemyImg.src="/sprites/enemy.png"
+const mapSize = 3000
 
-/* ======================
-PLAYER
-====================== */
-
-const player={
-x:500,
-y:500,
-vx:0,
-vy:0,
-speed:3,
+const player = {
+x:1500,
+y:1500,
+speed:4,
 hp:100,
-coins:0,
-dashCooldown:0,
-damage:20
+maxHp:100,
+dashCooldown:0
 }
 
-/* ======================
-INPUT
-====================== */
-
-const keys={}
-
-window.addEventListener("keydown",e=>{
-
-keys[e.key]=true
-
-if(e.key==="b") shopOpen=!shopOpen
-
-})
-
-window.addEventListener("keyup",e=>keys[e.key]=false)
-
-/* ======================
-OBJECTS
-====================== */
+const keys = {}
 
 const bullets=[]
 const enemies=[]
+const coins=[]
 const powerups=[]
+const damageNumbers=[]
 
-let score=0
-let shopOpen=false
+let camera = {x:0,y:0}
 
-/* ======================
-MAP WALLS
-====================== */
+/* =============================
+INPUT
+============================= */
 
-const walls=[
-{x:300,y:300,w:200,h:40},
-{x:700,y:500,w:40,h:200},
-{x:900,y:200,w:200,h:40}
-]
+window.addEventListener("keydown",e=>{
+keys[e.key.toLowerCase()] = true
+})
 
-/* ======================
+window.addEventListener("keyup",e=>{
+keys[e.key.toLowerCase()] = false
+})
+
+let mouse = {x:0,y:0}
+
+canvas.addEventListener("mousemove",e=>{
+mouse.x=e.clientX
+mouse.y=e.clientY
+})
+
+canvas.addEventListener("mousedown",shoot)
+
+/* =============================
+SHOOTING
+============================= */
+
+function shoot(){
+
+const angle = Math.atan2(
+mouse.y - canvas.height/2,
+mouse.x - canvas.width/2
+)
+
+bullets.push({
+x:player.x,
+y:player.y,
+vx:Math.cos(angle)*10,
+vy:Math.sin(angle)*10,
+life:80
+})
+
+}
+
+/* =============================
+DASH
+============================= */
+
+window.addEventListener("keydown",e=>{
+
+if(e.key===" " && player.dashCooldown<=0){
+
+const angle = Math.atan2(
+mouse.y - canvas.height/2,
+mouse.x - canvas.width/2
+)
+
+player.x += Math.cos(angle)*120
+player.y += Math.sin(angle)*120
+
+player.dashCooldown=120
+}
+
+})
+
+/* =============================
+SPAWN ENEMIES
+============================= */
+
+function spawnEnemy(){
+
+const angle=Math.random()*Math.PI*2
+const dist=800
+
+enemies.push({
+x:player.x + Math.cos(angle)*dist,
+y:player.y + Math.sin(angle)*dist,
+hp:40,
+speed:1.5
+})
+
+}
+
+/* =============================
+SPAWN BOSS
+============================= */
+
+function spawnBoss(){
+
+enemies.push({
+x:player.x+500,
+y:player.y+500,
+hp:400,
+speed:0.8,
+boss:true
+})
+
+}
+
+/* =============================
 POWERUPS
-====================== */
+============================= */
 
 function spawnPowerup(){
 
 const types=["heal","speed","damage"]
 
 powerups.push({
-x:Math.random()*1500,
-y:Math.random()*1500,
+x:Math.random()*mapSize,
+y:Math.random()*mapSize,
 type:types[Math.floor(Math.random()*types.length)]
 })
 
 }
 
-setInterval(spawnPowerup,8000)
+/* =============================
+DAMAGE NUMBERS
+============================= */
 
-/* ======================
-ENEMIES
-====================== */
+function spawnDamage(x,y,value){
 
-function spawnEnemy(){
-
-enemies.push({
-x:Math.random()*1500,
-y:Math.random()*1500,
-speed:1.5,
-hp:40
+damageNumbers.push({
+x,y,value,life:60
 })
 
 }
 
-setInterval(spawnEnemy,3000)
-
-/* ======================
-SHOOT
-====================== */
-
-canvas.addEventListener("click",()=>{
-
-bullets.push({
-x:player.x,
-y:player.y,
-vx:6,
-vy:0
-})
-
-})
-
-/* ======================
-PLAYER UPDATE
-====================== */
+/* =============================
+PLAYER MOVEMENT
+============================= */
 
 function updatePlayer(){
 
-if(keys["w"]) player.vy=-player.speed
-else if(keys["s"]) player.vy=player.speed
-else player.vy=0
+if(keys["w"]) player.y-=player.speed
+if(keys["s"]) player.y+=player.speed
+if(keys["a"]) player.x-=player.speed
+if(keys["d"]) player.x+=player.speed
 
-if(keys["a"]) player.vx=-player.speed
-else if(keys["d"]) player.vx=player.speed
-else player.vx=0
-
-/* dash ability */
-
-if(keys[" "] && player.dashCooldown<=0){
-
-player.vx*=6
-player.vy*=6
-player.dashCooldown=60
+player.x=Math.max(0,Math.min(mapSize,player.x))
+player.y=Math.max(0,Math.min(mapSize,player.y))
 
 }
 
-player.dashCooldown--
+/* =============================
+UPDATE BULLETS
+============================= */
 
-player.x+=player.vx
-player.y+=player.vy
+function updateBullets(){
+
+bullets.forEach((b,i)=>{
+
+b.x+=b.vx
+b.y+=b.vy
+b.life--
+
+if(b.life<=0) bullets.splice(i,1)
+
+})
 
 }
 
-/* ======================
-WALL COLLISION
-====================== */
+/* =============================
+UPDATE ENEMIES
+============================= */
 
-function checkWalls(){
+function updateEnemies(){
 
-walls.forEach(w=>{
+enemies.forEach((e,i)=>{
 
-if(
-player.x > w.x &&
-player.x < w.x+w.w &&
-player.y > w.y &&
-player.y < w.y+w.h
-){
+const dx=player.x-e.x
+const dy=player.y-e.y
+const dist=Math.hypot(dx,dy)
 
-player.x-=player.vx
-player.y-=player.vy
+e.x += dx/dist * e.speed
+e.y += dy/dist * e.speed
+
+if(dist<30){
+
+player.hp-=0.1
+
+}
+
+bullets.forEach((b,bi)=>{
+
+const d = Math.hypot(b.x-e.x,b.y-e.y)
+
+if(d<20){
+
+e.hp-=10
+spawnDamage(e.x,e.y,10)
+
+b.life=0
+
+}
+
+})
+
+if(e.hp<=0){
+
+coins.push({x:e.x,y:e.y})
+score+=10
+
+enemies.splice(i,1)
 
 }
 
@@ -181,23 +249,38 @@ player.y-=player.vy
 
 }
 
-/* ======================
-POWERUP COLLECTION
-====================== */
+/* =============================
+UPDATE COINS
+============================= */
+
+function updateCoins(){
+
+coins.forEach((c,i)=>{
+
+if(Math.hypot(player.x-c.x,player.y-c.y)<30){
+
+score+=5
+coins.splice(i,1)
+
+}
+
+})
+
+}
+
+/* =============================
+UPDATE POWERUPS
+============================= */
 
 function updatePowerups(){
 
 powerups.forEach((p,i)=>{
 
-const dx=player.x-p.x
-const dy=player.y-p.y
-const d=Math.hypot(dx,dy)
+if(Math.hypot(player.x-p.x,player.y-p.y)<30){
 
-if(d<30){
-
-if(p.type==="heal") player.hp+=20
+if(p.type==="heal") player.hp=Math.min(player.maxHp,player.hp+20)
 if(p.type==="speed") player.speed+=1
-if(p.type==="damage") player.damage+=10
+if(p.type==="damage") score+=50
 
 powerups.splice(i,1)
 
@@ -207,208 +290,208 @@ powerups.splice(i,1)
 
 }
 
-/* ======================
-ENEMY AI
-====================== */
+/* =============================
+UPDATE DAMAGE TEXT
+============================= */
 
-function updateEnemies(){
+function updateDamage(){
 
-enemies.forEach((e,ei)=>{
+damageNumbers.forEach((d,i)=>{
 
-const dx=player.x-e.x
-const dy=player.y-e.y
-const dist=Math.hypot(dx,dy)
+d.y-=0.5
+d.life--
 
-e.x+=dx/dist*e.speed
-e.y+=dy/dist*e.speed
-
-if(dist<30){
-
-player.hp-=0.1
-
-}
+if(d.life<=0) damageNumbers.splice(i,1)
 
 })
 
 }
 
-/* ======================
-BULLETS
-====================== */
+/* =============================
+CAMERA
+============================= */
 
-function updateBullets(){
+function updateCamera(){
 
-bullets.forEach((b,bi)=>{
-
-b.x+=b.vx
-
-enemies.forEach((e,ei)=>{
-
-const d=Math.hypot(b.x-e.x,b.y-e.y)
-
-if(d<30){
-
-e.hp-=player.damage
-
-bullets.splice(bi,1)
-
-if(e.hp<=0){
-
-player.coins+=10
-score+=10
-enemies.splice(ei,1)
+camera.x = player.x - canvas.width/2
+camera.y = player.y - canvas.height/2
 
 }
 
-}
+/* =============================
+DRAW PLAYER
+============================= */
 
-})
+function drawPlayer(){
 
-})
+ctx.fillStyle="#3aa0ff"
 
-}
-
-/* ======================
-SHOP
-====================== */
-
-function drawShop(){
-
-ctx.fillStyle="rgba(0,0,0,0.8)"
-ctx.fillRect(200,100,600,400)
-
-ctx.fillStyle="white"
-ctx.font="30px Arial"
-
-ctx.fillText("SHOP",450,150)
-
-ctx.font="20px Arial"
-
-ctx.fillText("1. Upgrade Damage (50 coins)",300,220)
-ctx.fillText("2. Upgrade Speed (50 coins)",300,260)
-ctx.fillText("3. Heal (30 coins)",300,300)
+ctx.beginPath()
+ctx.arc(player.x-camera.x,player.y-camera.y,20,0,Math.PI*2)
+ctx.fill()
 
 }
 
-/* shop purchases */
+/* =============================
+DRAW ENEMY
+============================= */
 
-window.addEventListener("keydown",e=>{
+function drawEnemy(e){
 
-if(!shopOpen) return
+ctx.fillStyle=e.boss ? "purple":"red"
 
-if(e.key==="1" && player.coins>=50){
-
-player.damage+=10
-player.coins-=50
-
-}
-
-if(e.key==="2" && player.coins>=50){
-
-player.speed+=1
-player.coins-=50
+ctx.beginPath()
+ctx.arc(e.x-camera.x,e.y-camera.y,e.boss?40:18,0,Math.PI*2)
+ctx.fill()
 
 }
 
-if(e.key==="3" && player.coins>=30){
-
-player.hp+=30
-player.coins-=30
-
-}
-
-})
-
-/* ======================
+/* =============================
 DRAW MAP
-====================== */
+============================= */
 
 function drawMap(){
 
 ctx.fillStyle="#1c1c1c"
-ctx.fillRect(0,0,canvas.width,canvas.height)
+ctx.fillRect(-camera.x,-camera.y,mapSize,mapSize)
 
-walls.forEach(w=>{
+}
 
-ctx.fillStyle="#555"
-ctx.fillRect(w.x,w.y,w.w,w.h)
+/* =============================
+DRAW HEALTHBAR
+============================= */
 
+function drawHealthBar(x,y,hp,max){
+
+ctx.fillStyle="red"
+ctx.fillRect(x-camera.x-20,y-camera.y-30,40,6)
+
+ctx.fillStyle="lime"
+ctx.fillRect(x-camera.x-20,y-camera.y-30,(hp/max)*40,6)
+
+}
+
+/* =============================
+DRAW DAMAGE
+============================= */
+
+function drawDamage(){
+
+ctx.fillStyle="white"
+ctx.font="16px Arial"
+
+damageNumbers.forEach(d=>{
+ctx.fillText(d.value,d.x-camera.x,d.y-camera.y)
 })
 
 }
 
-/* ======================
-DRAW
-====================== */
+/* =============================
+DRAW COINS
+============================= */
 
-function draw(){
+function drawCoins(){
 
-drawMap()
+coins.forEach(c=>{
 
-ctx.drawImage(playerImg,player.x-32,player.y-32,64,64)
-
-bullets.forEach(b=>{
-
-ctx.fillStyle="yellow"
-ctx.fillRect(b.x,b.y,5,5)
-
-})
-
-enemies.forEach(e=>{
-
-ctx.drawImage(enemyImg,e.x-32,e.y-32,64,64)
-
-})
-
-powerups.forEach(p=>{
-
-ctx.fillStyle="lime"
-
+ctx.fillStyle="gold"
 ctx.beginPath()
-ctx.arc(p.x,p.y,10,0,Math.PI*2)
+ctx.arc(c.x-camera.x,c.y-camera.y,8,0,Math.PI*2)
 ctx.fill()
 
 })
 
-ctx.fillStyle="white"
-ctx.fillText("Score: "+score,20,30)
-ctx.fillText("Coins: "+player.coins,20,60)
-ctx.fillText("HP: "+Math.floor(player.hp),20,90)
+}
 
-if(shopOpen) drawShop()
+/* =============================
+DRAW POWERUPS
+============================= */
+
+function drawPowerups(){
+
+powerups.forEach(p=>{
+
+ctx.fillStyle="cyan"
+
+ctx.beginPath()
+ctx.arc(p.x-camera.x,p.y-camera.y,10,0,Math.PI*2)
+ctx.fill()
+
+})
 
 }
 
-/* ======================
+/* =============================
+DRAW UI
+============================= */
+
+function drawUI(){
+
+ctx.fillStyle="white"
+ctx.font="20px Arial"
+ctx.fillText("Score: "+score,20,30)
+
+ctx.fillText("HP: "+Math.floor(player.hp),20,60)
+
+}
+
+/* =============================
 GAME LOOP
-====================== */
+============================= */
 
-function update(){
+function gameLoop(){
 
-if(!shopOpen){
+frame++
+
+ctx.clearRect(0,0,canvas.width,canvas.height)
 
 updatePlayer()
-checkWalls()
 updateBullets()
 updateEnemies()
+updateCoins()
 updatePowerups()
+updateDamage()
+
+updateCamera()
+
+drawMap()
+
+drawPlayer()
+
+enemies.forEach(e=>{
+drawEnemy(e)
+drawHealthBar(e.x,e.y,e.hp,e.boss?400:40)
+})
+
+drawCoins()
+drawPowerups()
+
+bullets.forEach(b=>{
+
+ctx.fillStyle="yellow"
+ctx.beginPath()
+ctx.arc(b.x-camera.x,b.y-camera.y,4,0,Math.PI*2)
+ctx.fill()
+
+})
+
+drawDamage()
+drawUI()
+
+if(frame%120===0) spawnEnemy()
+if(frame%900===0) spawnBoss()
+if(frame%600===0) spawnPowerup()
+
+if(player.dashCooldown>0) player.dashCooldown--
+
+requestAnimationFrame(gameLoop)
 
 }
 
-}
-
-function loop(){
-
-update()
-draw()
-requestAnimationFrame(loop)
-
-}
-
-loop()
+gameLoop()
 
 },[])
 
-return <canvas ref={canvasRef}/>
+return <canvas ref={canvasRef} style={{display:"block"}}/>
 
 }
