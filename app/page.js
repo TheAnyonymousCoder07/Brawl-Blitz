@@ -2,340 +2,369 @@
 import { useEffect, useRef } from "react"
 
 export default function Home() {
-  const canvasRef = useRef(null)
-
-  useEffect(() => {
-
-    const canvas = canvasRef.current
-    const ctx = canvas.getContext("2d")
-
-    const keys = {}
-    const mouse = { x: 0, y: 0 }
-
-    const shootSound = new Audio("/sounds/shoot.wav")
-    const powerSound = new Audio("/sounds/power.wav")
-
-    const playerImg = new Image()
-    playerImg.src = "/sprites/player.png"
-
-    const enemyImg = new Image()
-    enemyImg.src = "/sprites/enemy.png"
-
-    const player = {
-      x: 400,
-      y: 250,
-      size: 30,
-      speed: 3,
-      health: 100,
-      attackCooldown: 0,
-      dashCooldown: 0
-    }
-
-    const bullets = []
-    const enemies = []
-    const powerups = []
-
-    const walls = [
-      {x:200,y:200,w:80,h:80},
-      {x:500,y:120,w:100,h:60},
-      {x:600,y:350,w:120,h:60}
-    ]
-
-    let wave = 1
 
-    function spawnWave(){
-      for(let i=0;i<wave*3;i++){
-        enemies.push({
-          x: Math.random()*800,
-          y: Math.random()*500,
-          size:30,
-          health:40
-        })
-      }
-    }
-
-    spawnWave()
-
-    window.addEventListener("keydown", e=>{
-      keys[e.key.toLowerCase()] = true
+const canvasRef = useRef(null)
 
-      if(e.key==="Shift" && player.dashCooldown<=0){
-        player.x += 80
-        player.dashCooldown = 120
-      }
-    })
+useEffect(()=>{
 
-    window.addEventListener("keyup", e=>{
-      keys[e.key.toLowerCase()] = false
-    })
+const canvas = canvasRef.current
+const ctx = canvas.getContext("2d")
 
-    canvas.addEventListener("mousemove", e=>{
-      const rect = canvas.getBoundingClientRect()
-      mouse.x = e.clientX - rect.left
-      mouse.y = e.clientY - rect.top
-    })
-
-    canvas.addEventListener("mousedown", ()=>{
-      if(player.attackCooldown<=0){
-
-        const dx = mouse.x - player.x
-        const dy = mouse.y - player.y
-        const dist = Math.sqrt(dx*dx + dy*dy)
+const screenWidth = 800
+const screenHeight = 500
 
-        if(dist>0){
-          bullets.push({
-            x: player.x,
-            y: player.y,
-            vx: (dx/dist)*7,
-            vy: (dy/dist)*7
-          })
-        }
-
-        shootSound.currentTime = 0
-        shootSound.play().catch(()=>{})
+const mapWidth = 2000
+const mapHeight = 2000
 
-        player.attackCooldown = 20
-      }
-    })
+const keys = {}
+const mouse = {x:0,y:0}
 
-    function movePlayer(){
+let score = 0
+let highScore = localStorage.getItem("brawlHighScore") || 0
 
-      let nx = player.x
-      let ny = player.y
+const playerImg = new Image()
+playerImg.src="/sprites/player.png"
 
-      if(keys["w"]) ny -= player.speed
-      if(keys["s"]) ny += player.speed
-      if(keys["a"]) nx -= player.speed
-      if(keys["d"]) nx += player.speed
+const enemyImg = new Image()
+enemyImg.src="/sprites/enemy.png"
 
-      let blocked = false
+const shootSound = new Audio("/sounds/shoot.wav")
 
-      walls.forEach(w=>{
-        if(nx > w.x && nx < w.x+w.w && ny > w.y && ny < w.y+w.h){
-          blocked = true
-        }
-      })
+const player={
+x:400,
+y:400,
+size:30,
+speed:4,
+health:100,
+attackCooldown:0
+}
 
-      if(!blocked){
-        player.x = nx
-        player.y = ny
-      }
+let camera={
+x:0,
+y:0
+}
 
-    }
+const bullets=[]
+const enemies=[]
 
-    function moveEnemies(){
+let wave=1
 
-      enemies.forEach(e=>{
-        const dx = player.x - e.x
-        const dy = player.y - e.y
-        const dist = Math.sqrt(dx*dx + dy*dy)
+function spawnWave(){
 
-        if(dist>0){
-          e.x += dx/dist * 1.2
-          e.y += dy/dist * 1.2
-        }
+for(let i=0;i<wave*3;i++){
 
-      })
+enemies.push({
+x:Math.random()*mapWidth,
+y:Math.random()*mapHeight,
+size:30,
+health:40,
+type:"normal"
+})
 
-    }
+}
 
-    function updateBullets(){
+if(wave%5===0){
 
-      bullets.forEach((b,i)=>{
+enemies.push({
+x:Math.random()*mapWidth,
+y:Math.random()*mapHeight,
+size:60,
+health:200,
+type:"boss"
+})
 
-        b.x += b.vx
-        b.y += b.vy
+}
 
-        if(
-          b.x < 0 ||
-          b.x > canvas.width ||
-          b.y < 0 ||
-          b.y > canvas.height
-        ){
-          bullets.splice(i,1)
-        }
+}
 
-      })
+spawnWave()
 
-    }
+window.addEventListener("keydown",e=>{
+keys[e.key.toLowerCase()]=true
+})
 
-    function checkHits(){
+window.addEventListener("keyup",e=>{
+keys[e.key.toLowerCase()]=false
+})
 
-      bullets.forEach(b=>{
-        enemies.forEach(e=>{
-          const dx = b.x - e.x
-          const dy = b.y - e.y
-          const dist = Math.sqrt(dx*dx + dy*dy)
+canvas.addEventListener("mousemove",e=>{
+const rect=canvas.getBoundingClientRect()
 
-          if(dist < e.size){
-            e.health -= 20
-            e.x += b.vx * 5
-            e.y += b.vy * 5
-          }
-        })
-      })
+mouse.x=e.clientX-rect.left
+mouse.y=e.clientY-rect.top
+})
 
-      enemies.forEach((e,i)=>{
-        if(e.health <= 0){
+canvas.addEventListener("mousedown",()=>{
 
-          enemies.splice(i,1)
+if(player.attackCooldown<=0){
 
-          if(Math.random() < 0.3){
-            powerups.push({
-              x:e.x,
-              y:e.y,
-              type:"health"
-            })
-          }
+const worldMouseX=mouse.x+camera.x
+const worldMouseY=mouse.y+camera.y
 
-        }
-      })
+const dx=worldMouseX-player.x
+const dy=worldMouseY-player.y
+const dist=Math.sqrt(dx*dx+dy*dy)
 
-    }
+bullets.push({
+x:player.x,
+y:player.y,
+vx:(dx/dist)*8,
+vy:(dy/dist)*8
+})
 
-    function checkPowerups(){
+shootSound.play().catch(()=>{})
 
-      powerups.forEach((p,i)=>{
+player.attackCooldown=20
 
-        const dx = player.x - p.x
-        const dy = player.y - p.y
-        const dist = Math.sqrt(dx*dx + dy*dy)
+}
 
-        if(dist < 30){
+})
 
-          if(p.type==="health"){
-            player.health += 20
-          }
+function movePlayer(){
 
-          powerSound.currentTime = 0
-          powerSound.play().catch(()=>{})
+if(keys["w"]) player.y-=player.speed
+if(keys["s"]) player.y+=player.speed
+if(keys["a"]) player.x-=player.speed
+if(keys["d"]) player.x+=player.speed
 
-          powerups.splice(i,1)
+player.x=Math.max(0,Math.min(mapWidth,player.x))
+player.y=Math.max(0,Math.min(mapHeight,player.y))
 
-        }
+}
 
-      })
+function updateCamera(){
 
-    }
+camera.x=player.x-screenWidth/2
+camera.y=player.y-screenHeight/2
 
-    function nextWaveCheck(){
+camera.x=Math.max(0,Math.min(mapWidth-screenWidth,camera.x))
+camera.y=Math.max(0,Math.min(mapHeight-screenHeight,camera.y))
 
-      if(enemies.length === 0){
-        wave++
-        spawnWave()
-      }
+}
 
-    }
+function moveEnemies(){
 
-    function drawArena(){
+enemies.forEach(e=>{
 
-      ctx.fillStyle = "#1a1a1a"
-      ctx.fillRect(0,0,canvas.width,canvas.height)
+const dx=player.x-e.x
+const dy=player.y-e.y
+const dist=Math.sqrt(dx*dx+dy*dy)
 
-    }
+if(dist>0){
 
-    function drawWalls(){
+let speed=1.5
+if(e.type==="boss") speed=0.7
 
-      ctx.fillStyle = "#444"
+e.x+=dx/dist*speed
+e.y+=dy/dist*speed
 
-      walls.forEach(w=>{
-        ctx.fillRect(w.x,w.y,w.w,w.h)
-      })
+}
 
-    }
+})
 
-    function drawPlayer(){
+}
 
-      ctx.drawImage(playerImg, player.x-20, player.y-20, 40, 40)
+function updateBullets(){
 
-    }
+bullets.forEach((b,i)=>{
 
-    function drawEnemies(){
+b.x+=b.vx
+b.y+=b.vy
 
-      enemies.forEach(e=>{
-        ctx.drawImage(enemyImg, e.x-20, e.y-20, 40, 40)
-      })
+if(b.x<0||b.x>mapWidth||b.y<0||b.y>mapHeight){
 
-    }
+bullets.splice(i,1)
 
-    function drawBullets(){
+}
 
-      ctx.fillStyle = "yellow"
+})
 
-      bullets.forEach(b=>{
-        ctx.fillRect(b.x,b.y,6,6)
-      })
+}
 
-    }
+function checkHits(){
 
-    function drawPowerups(){
+bullets.forEach(b=>{
 
-      ctx.fillStyle = "lime"
+enemies.forEach(e=>{
 
-      powerups.forEach(p=>{
-        ctx.fillRect(p.x-10,p.y-10,20,20)
-      })
+const dx=b.x-e.x
+const dy=b.y-e.y
+const dist=Math.sqrt(dx*dx+dy*dy)
 
-    }
+if(dist<e.size){
 
-    function drawUI(){
+e.health-=20
 
-      ctx.fillStyle = "white"
-      ctx.font = "16px Arial"
+if(e.health<=0){
 
-      ctx.fillText("HP: " + player.health, 20, 25)
-      ctx.fillText("Wave: " + wave, 20, 45)
+score+=10
+if(e.type==="boss") score+=100
 
-      ctx.fillText("Attack",650,470)
-      ctx.strokeRect(640,440,80,40)
+}
 
-      ctx.fillText("Dash",550,470)
-      ctx.strokeRect(540,440,80,40)
+}
 
-    }
+})
 
-    function gameLoop(){
+})
 
-      movePlayer()
-      moveEnemies()
-      updateBullets()
-      checkHits()
-      checkPowerups()
-      nextWaveCheck()
+enemies.forEach((e,i)=>{
 
-      if(player.attackCooldown>0) player.attackCooldown--
-      if(player.dashCooldown>0) player.dashCooldown--
+if(e.health<=0){
 
-      drawArena()
-      drawWalls()
-      drawPlayer()
-      drawEnemies()
-      drawBullets()
-      drawPowerups()
-      drawUI()
+enemies.splice(i,1)
 
-      requestAnimationFrame(gameLoop)
+}
 
-    }
+})
 
-    gameLoop()
+}
 
-  },[])
+function nextWave(){
 
-  return (
-    <main style={{textAlign:"center"}}>
-      <h1>Brawl Blitz</h1>
-      <p>WASD Move | Mouse Shoot | Shift Dash</p>
+if(enemies.length===0){
 
-      <canvas
-        ref={canvasRef}
-        width={800}
-        height={500}
-        style={{
-          border:"3px solid white",
-          background:"black"
-        }}
-      />
-    </main>
-  )
+wave++
+spawnWave()
+
+}
+
+}
+
+function drawMap(){
+
+ctx.fillStyle="#1a1a1a"
+ctx.fillRect(0,0,screenWidth,screenHeight)
+
+}
+
+function drawPlayer(){
+
+ctx.drawImage(
+playerImg,
+player.x-camera.x-20,
+player.y-camera.y-20,
+40,
+40
+)
+
+}
+
+function drawEnemies(){
+
+enemies.forEach(e=>{
+
+ctx.drawImage(
+enemyImg,
+e.x-camera.x-20,
+e.y-camera.y-20,
+e.size,
+e.size
+)
+
+})
+
+}
+
+function drawBullets(){
+
+ctx.fillStyle="yellow"
+
+bullets.forEach(b=>{
+
+ctx.fillRect(
+b.x-camera.x,
+b.y-camera.y,
+6,
+6
+)
+
+})
+
+}
+
+function drawAimLine(){
+
+ctx.strokeStyle="red"
+ctx.beginPath()
+
+ctx.moveTo(
+player.x-camera.x,
+player.y-camera.y
+)
+
+ctx.lineTo(
+mouse.x,
+mouse.y
+)
+
+ctx.stroke()
+
+}
+
+function drawUI(){
+
+ctx.fillStyle="white"
+ctx.font="16px Arial"
+
+ctx.fillText("HP: "+player.health,20,25)
+ctx.fillText("Wave: "+wave,20,45)
+ctx.fillText("Score: "+score,20,65)
+ctx.fillText("High Score: "+highScore,20,85)
+
+}
+
+function gameLoop(){
+
+movePlayer()
+moveEnemies()
+updateBullets()
+checkHits()
+nextWave()
+updateCamera()
+
+if(player.attackCooldown>0) player.attackCooldown--
+
+if(score>highScore){
+
+highScore=score
+localStorage.setItem("brawlHighScore",score)
+
+}
+
+drawMap()
+drawPlayer()
+drawEnemies()
+drawBullets()
+drawAimLine()
+drawUI()
+
+requestAnimationFrame(gameLoop)
+
+}
+
+gameLoop()
+
+},[])
+
+return(
+
+<main style={{textAlign:"center"}}>
+
+<h1>Brawl Blitz</h1>
+
+<canvas
+ref={canvasRef}
+width={800}
+height={500}
+style={{
+border:"3px solid white",
+background:"black"
+}}
+/>
+
+</main>
+
+)
+
 }
