@@ -32,64 +32,66 @@ export default function Home() {
 
     const bullets = []
     const enemies = []
+    const powerups = []
+
     const walls = [
       {x:200,y:200,w:80,h:80},
       {x:500,y:120,w:100,h:60},
       {x:600,y:350,w:120,h:60}
     ]
 
-    const powerups = []
-
     let wave = 1
 
-    function spawnWave() {
-      for (let i = 0; i < wave * 3; i++) {
+    function spawnWave(){
+      for(let i=0;i<wave*3;i++){
         enemies.push({
-          x: Math.random() * 800,
-          y: Math.random() * 500,
-          health: 40,
-          size: 30
+          x:Math.random()*800,
+          y:Math.random()*500,
+          size:30,
+          health:40
         })
       }
     }
 
     spawnWave()
 
-    window.addEventListener("keydown", e => {
+    window.addEventListener("keydown",e=>{
       keys[e.key.toLowerCase()] = true
 
-      if (e.key === "Shift" && player.dashCooldown <= 0) {
+      if(e.key==="Shift" && player.dashCooldown<=0){
         player.x += 80
         player.dashCooldown = 120
       }
     })
 
-    window.addEventListener("keyup", e => {
+    window.addEventListener("keyup",e=>{
       keys[e.key.toLowerCase()] = false
     })
 
-    canvas.addEventListener("mousemove", e => {
+    canvas.addEventListener("mousemove",e=>{
       const rect = canvas.getBoundingClientRect()
       mouse.x = e.clientX - rect.left
       mouse.y = e.clientY - rect.top
     })
 
-    canvas.addEventListener("mousedown", () => {
-      if (player.attackCooldown <= 0) {
+    canvas.addEventListener("mousedown",()=>{
+      if(player.attackCooldown<=0){
 
-        const dx = mouse.x - player.x
-        const dy = mouse.y - player.y
+        const dx = mouse.x-player.x
+        const dy = mouse.y-player.y
         const dist = Math.sqrt(dx*dx + dy*dy)
 
-        bullets.push({
-          x: player.x,
-          y: player.y,
-          vx: (dx/dist)*7,
-          vy: (dy/dist)*7
-        })
+        if(dist>0){
+          bullets.push({
+            x:player.x,
+            y:player.y,
+            vx:(dx/dist)*7,
+            vy:(dy/dist)*7
+          })
+        }
 
         shootSound.currentTime = 0
-        shootSound.play()
+        shootSound.play().catch(()=>{})
 
         player.attackCooldown = 20
       }
@@ -104,16 +106,17 @@ export default function Home() {
       if(keys["a"]) nx -= player.speed
       if(keys["d"]) nx += player.speed
 
-      let blocked = false
+      let blocked=false
+
       walls.forEach(w=>{
-        if(nx > w.x && nx < w.x+w.w && ny > w.y && ny < w.y+w.h){
-          blocked = true
+        if(nx>w.x && nx<w.x+w.w && ny>w.y && ny<w.y+w.h){
+          blocked=true
         }
       })
 
       if(!blocked){
-        player.x = nx
-        player.y = ny
+        player.x=nx
+        player.y=ny
       }
     }
 
@@ -123,38 +126,49 @@ export default function Home() {
         const dy = player.y - e.y
         const dist = Math.sqrt(dx*dx + dy*dy)
 
-        e.x += dx/dist * 1.2
-        e.y += dy/dist * 1.2
+        if(dist>0){
+          e.x += dx/dist * 1.2
+          e.y += dy/dist * 1.2
+        }
       })
     }
 
     function updateBullets(){
-      bullets.forEach(b=>{
+      bullets.forEach((b,i)=>{
         b.x += b.vx
         b.y += b.vy
+
+        if(
+          b.x < 0 ||
+          b.x > canvas.width ||
+          b.y < 0 ||
+          b.y > canvas.height
+        ){
+          bullets.splice(i,1)
+        }
       })
     }
 
     function checkHits(){
       bullets.forEach(b=>{
         enemies.forEach(e=>{
-          const dx = b.x - e.x
-          const dy = b.y - e.y
-          const dist = Math.sqrt(dx*dx + dy*dy)
+          const dx=b.x-e.x
+          const dy=b.y-e.y
+          const dist=Math.sqrt(dx*dx+dy*dy)
 
-          if(dist < e.size){
+          if(dist<e.size){
             e.health -= 20
-            e.x += b.vx * 6
-            e.y += b.vy * 6
+            e.x += b.vx * 5
+            e.y += b.vy * 5
           }
         })
       })
 
       enemies.forEach((e,i)=>{
-        if(e.health <= 0){
+        if(e.health<=0){
           enemies.splice(i,1)
 
-          if(Math.random() < 0.3){
+          if(Math.random()<0.3){
             powerups.push({
               x:e.x,
               y:e.y,
@@ -167,23 +181,25 @@ export default function Home() {
 
     function checkPowerups(){
       powerups.forEach((p,i)=>{
-        const dx = player.x - p.x
-        const dy = player.y - p.y
-        const dist = Math.sqrt(dx*dx + dy*dy)
+        const dx=player.x-p.x
+        const dy=player.y-p.y
+        const dist=Math.sqrt(dx*dx+dy*dy)
 
-        if(dist < 30){
+        if(dist<30){
           if(p.type==="health"){
             player.health += 20
           }
 
-          powerSound.play()
+          powerSound.currentTime = 0
+          powerSound.play().catch(()=>{})
+
           powerups.splice(i,1)
         }
       })
     }
 
     function nextWaveCheck(){
-      if(enemies.length === 0){
+      if(enemies.length===0){
         wave++
         spawnWave()
       }
@@ -240,6 +256,7 @@ export default function Home() {
     }
 
     function gameLoop(){
+
       movePlayer()
       moveEnemies()
       updateBullets()
