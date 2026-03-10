@@ -5,20 +5,21 @@ export default function Home() {
   const canvasRef = useRef(null)
 
   useEffect(() => {
+
     const canvas = canvasRef.current
     const ctx = canvas.getContext("2d")
 
     const keys = {}
     const mouse = { x: 0, y: 0 }
 
-    const shootSound = new Audio("/shoot.wav")
-    const powerSound = new Audio("/power.wav")
+    const shootSound = new Audio("/sounds/shoot.wav")
+    const powerSound = new Audio("/sounds/power.wav")
 
     const playerImg = new Image()
-    playerImg.src = "/player.png"
+    playerImg.src = "/sprites/player.png"
 
     const enemyImg = new Image()
-    enemyImg.src = "/enemy.png"
+    enemyImg.src = "/sprites/enemy.png"
 
     const player = {
       x: 400,
@@ -45,8 +46,8 @@ export default function Home() {
     function spawnWave(){
       for(let i=0;i<wave*3;i++){
         enemies.push({
-          x:Math.random()*800,
-          y:Math.random()*500,
+          x: Math.random()*800,
+          y: Math.random()*500,
           size:30,
           health:40
         })
@@ -55,7 +56,7 @@ export default function Home() {
 
     spawnWave()
 
-    window.addEventListener("keydown",e=>{
+    window.addEventListener("keydown", e=>{
       keys[e.key.toLowerCase()] = true
 
       if(e.key==="Shift" && player.dashCooldown<=0){
@@ -64,29 +65,29 @@ export default function Home() {
       }
     })
 
-    window.addEventListener("keyup",e=>{
+    window.addEventListener("keyup", e=>{
       keys[e.key.toLowerCase()] = false
     })
 
-    canvas.addEventListener("mousemove",e=>{
+    canvas.addEventListener("mousemove", e=>{
       const rect = canvas.getBoundingClientRect()
       mouse.x = e.clientX - rect.left
       mouse.y = e.clientY - rect.top
     })
 
-    canvas.addEventListener("mousedown",()=>{
+    canvas.addEventListener("mousedown", ()=>{
       if(player.attackCooldown<=0){
 
-        const dx = mouse.x-player.x
-        const dy = mouse.y-player.y
+        const dx = mouse.x - player.x
+        const dy = mouse.y - player.y
         const dist = Math.sqrt(dx*dx + dy*dy)
 
         if(dist>0){
           bullets.push({
-            x:player.x,
-            y:player.y,
-            vx:(dx/dist)*7,
-            vy:(dy/dist)*7
+            x: player.x,
+            y: player.y,
+            vx: (dx/dist)*7,
+            vy: (dy/dist)*7
           })
         }
 
@@ -98,6 +99,7 @@ export default function Home() {
     })
 
     function movePlayer(){
+
       let nx = player.x
       let ny = player.y
 
@@ -106,21 +108,23 @@ export default function Home() {
       if(keys["a"]) nx -= player.speed
       if(keys["d"]) nx += player.speed
 
-      let blocked=false
+      let blocked = false
 
       walls.forEach(w=>{
-        if(nx>w.x && nx<w.x+w.w && ny>w.y && ny<w.y+w.h){
-          blocked=true
+        if(nx > w.x && nx < w.x+w.w && ny > w.y && ny < w.y+w.h){
+          blocked = true
         }
       })
 
       if(!blocked){
-        player.x=nx
-        player.y=ny
+        player.x = nx
+        player.y = ny
       }
+
     }
 
     function moveEnemies(){
+
       enemies.forEach(e=>{
         const dx = player.x - e.x
         const dy = player.y - e.y
@@ -130,11 +134,15 @@ export default function Home() {
           e.x += dx/dist * 1.2
           e.y += dy/dist * 1.2
         }
+
       })
+
     }
 
     function updateBullets(){
+
       bullets.forEach((b,i)=>{
+
         b.x += b.vx
         b.y += b.vy
 
@@ -146,17 +154,20 @@ export default function Home() {
         ){
           bullets.splice(i,1)
         }
+
       })
+
     }
 
     function checkHits(){
+
       bullets.forEach(b=>{
         enemies.forEach(e=>{
-          const dx=b.x-e.x
-          const dy=b.y-e.y
-          const dist=Math.sqrt(dx*dx+dy*dy)
+          const dx = b.x - e.x
+          const dy = b.y - e.y
+          const dist = Math.sqrt(dx*dx + dy*dy)
 
-          if(dist<e.size){
+          if(dist < e.size){
             e.health -= 20
             e.x += b.vx * 5
             e.y += b.vy * 5
@@ -165,27 +176,33 @@ export default function Home() {
       })
 
       enemies.forEach((e,i)=>{
-        if(e.health<=0){
+        if(e.health <= 0){
+
           enemies.splice(i,1)
 
-          if(Math.random()<0.3){
+          if(Math.random() < 0.3){
             powerups.push({
               x:e.x,
               y:e.y,
               type:"health"
             })
           }
+
         }
       })
+
     }
 
     function checkPowerups(){
-      powerups.forEach((p,i)=>{
-        const dx=player.x-p.x
-        const dy=player.y-p.y
-        const dist=Math.sqrt(dx*dx+dy*dy)
 
-        if(dist<30){
+      powerups.forEach((p,i)=>{
+
+        const dx = player.x - p.x
+        const dy = player.y - p.y
+        const dist = Math.sqrt(dx*dx + dy*dy)
+
+        if(dist < 30){
+
           if(p.type==="health"){
             player.health += 20
           }
@@ -194,65 +211,87 @@ export default function Home() {
           powerSound.play().catch(()=>{})
 
           powerups.splice(i,1)
+
         }
+
       })
+
     }
 
     function nextWaveCheck(){
-      if(enemies.length===0){
+
+      if(enemies.length === 0){
         wave++
         spawnWave()
       }
+
     }
 
     function drawArena(){
-      ctx.fillStyle="#1a1a1a"
+
+      ctx.fillStyle = "#1a1a1a"
       ctx.fillRect(0,0,canvas.width,canvas.height)
+
     }
 
     function drawWalls(){
-      ctx.fillStyle="#444"
+
+      ctx.fillStyle = "#444"
+
       walls.forEach(w=>{
         ctx.fillRect(w.x,w.y,w.w,w.h)
       })
+
     }
 
     function drawPlayer(){
-      ctx.drawImage(playerImg,player.x-20,player.y-20,40,40)
+
+      ctx.drawImage(playerImg, player.x-20, player.y-20, 40, 40)
+
     }
 
     function drawEnemies(){
+
       enemies.forEach(e=>{
-        ctx.drawImage(enemyImg,e.x-20,e.y-20,40,40)
+        ctx.drawImage(enemyImg, e.x-20, e.y-20, 40, 40)
       })
+
     }
 
     function drawBullets(){
-      ctx.fillStyle="yellow"
+
+      ctx.fillStyle = "yellow"
+
       bullets.forEach(b=>{
         ctx.fillRect(b.x,b.y,6,6)
       })
+
     }
 
     function drawPowerups(){
-      ctx.fillStyle="lime"
+
+      ctx.fillStyle = "lime"
+
       powerups.forEach(p=>{
         ctx.fillRect(p.x-10,p.y-10,20,20)
       })
+
     }
 
     function drawUI(){
-      ctx.fillStyle="white"
-      ctx.font="16px Arial"
 
-      ctx.fillText("HP: "+player.health,20,25)
-      ctx.fillText("Wave: "+wave,20,45)
+      ctx.fillStyle = "white"
+      ctx.font = "16px Arial"
+
+      ctx.fillText("HP: " + player.health, 20, 25)
+      ctx.fillText("Wave: " + wave, 20, 45)
 
       ctx.fillText("Attack",650,470)
       ctx.strokeRect(640,440,80,40)
 
       ctx.fillText("Dash",550,470)
       ctx.strokeRect(540,440,80,40)
+
     }
 
     function gameLoop(){
@@ -276,6 +315,7 @@ export default function Home() {
       drawUI()
 
       requestAnimationFrame(gameLoop)
+
     }
 
     gameLoop()
