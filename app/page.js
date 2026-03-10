@@ -1,14 +1,16 @@
 export default function ShopPage() {
   return (
     <div style={{
-      color: "white",
-      textAlign: "center",
-      marginTop: "100px",
+      height: "100vh",
       background: "#0f0f0f",
-      height: "100vh"
+      color: "white",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center"
     }}>
       <h1>Shop</h1>
-      <p>Skins and items will appear here.</p>
+      <p>Skins and items will appear here later.</p>
     </div>
   )
 }
