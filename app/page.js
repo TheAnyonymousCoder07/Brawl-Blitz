@@ -1,177 +1,214 @@
-'use client'
+"use client"
+
 import { useEffect, useRef } from "react"
 
-export default function Home() {
+export default function Page() {
 
 const canvasRef = useRef(null)
 
-useEffect(()=>{
+useEffect(() => {
 
 const canvas = canvasRef.current
 const ctx = canvas.getContext("2d")
 
-const screenWidth = 800
-const screenHeight = 500
+canvas.width = window.innerWidth
+canvas.height = window.innerHeight
 
-const mapWidth = 2000
-const mapHeight = 2000
+/* ======================
+INPUT SYSTEM
+====================== */
 
 const keys = {}
-const mouse = {x:0,y:0}
 
-let score = 0
-let highScore = localStorage.getItem("brawlHighScore") || 0
+window.addEventListener("keydown", e => keys[e.key.toLowerCase()] = true)
+window.addEventListener("keyup", e => keys[e.key.toLowerCase()] = false)
 
-const playerImg = new Image()
-playerImg.src="/sprites/player.png"
+let mouse = {x:0,y:0}
 
-const enemyImg = new Image()
-enemyImg.src="/sprites/enemy.png"
+canvas.addEventListener("mousemove", e=>{
+mouse.x = e.clientX
+mouse.y = e.clientY
+})
 
-const shootSound = new Audio("/sounds/shoot.wav")
+canvas.addEventListener("click", shoot)
 
-const player={
-x:400,
-y:400,
-size:30,
-speed:4,
-health:100,
-attackCooldown:0
+/* ======================
+PLAYER
+====================== */
+
+const player = {
+x:500,
+y:500,
+vx:0,
+vy:0,
+speed:0.6,
+friction:0.85,
+hp:100,
+maxHp:100,
+dashCooldown:0
 }
 
-let camera={
+/* ======================
+CAMERA
+====================== */
+
+const camera = {
 x:0,
 y:0
 }
 
-const bullets=[]
-const enemies=[]
+/* ======================
+GAME OBJECTS
+====================== */
 
-let wave=1
+const enemies = []
+const bullets = []
+const powerups = []
+const damageTexts = []
 
-function spawnWave(){
+let score = 0
+let wave = 1
 
-for(let i=0;i<wave*3;i++){
+/* ======================
+SPAWN ENEMY
+====================== */
 
-enemies.push({
-x:Math.random()*mapWidth,
-y:Math.random()*mapHeight,
-size:30,
-health:40,
-type:"normal"
-})
-
-}
-
-if(wave%5===0){
+function spawnEnemy(){
 
 enemies.push({
-x:Math.random()*mapWidth,
-y:Math.random()*mapHeight,
-size:60,
-health:200,
-type:"boss"
+x:Math.random()*3000,
+y:Math.random()*3000,
+vx:0,
+vy:0,
+speed:1 + wave*0.1,
+hp:40 + wave*5,
+maxHp:40 + wave*5
 })
 
 }
 
+/* ======================
+SPAWN BOSS
+====================== */
+
+function spawnBoss(){
+
+enemies.push({
+x:Math.random()*3000,
+y:Math.random()*3000,
+vx:0,
+vy:0,
+speed:1,
+hp:600,
+maxHp:600,
+boss:true
+})
+
 }
 
-spawnWave()
+/* ======================
+POWERUPS
+====================== */
 
-window.addEventListener("keydown",e=>{
-keys[e.key.toLowerCase()]=true
+function spawnPowerup(){
+
+powerups.push({
+x:Math.random()*3000,
+y:Math.random()*3000,
+type:"heal"
 })
 
-window.addEventListener("keyup",e=>{
-keys[e.key.toLowerCase()]=false
-})
+}
 
-canvas.addEventListener("mousemove",e=>{
-const rect=canvas.getBoundingClientRect()
+/* ======================
+SHOOT
+====================== */
 
-mouse.x=e.clientX-rect.left
-mouse.y=e.clientY-rect.top
-})
+function shoot(){
 
-canvas.addEventListener("mousedown",()=>{
-
-if(player.attackCooldown<=0){
-
-const worldMouseX=mouse.x+camera.x
-const worldMouseY=mouse.y+camera.y
-
-const dx=worldMouseX-player.x
-const dy=worldMouseY-player.y
-const dist=Math.sqrt(dx*dx+dy*dy)
+const angle = Math.atan2(
+mouse.y - canvas.height/2,
+mouse.x - canvas.width/2
+)
 
 bullets.push({
 x:player.x,
 y:player.y,
-vx:(dx/dist)*8,
-vy:(dy/dist)*8
+vx:Math.cos(angle)*10,
+vy:Math.sin(angle)*10,
+damage:20
 })
-
-shootSound.play().catch(()=>{})
-
-player.attackCooldown=20
 
 }
 
-})
+/* ======================
+PLAYER UPDATE
+====================== */
 
-function movePlayer(){
+function updatePlayer(){
 
-if(keys["w"]) player.y-=player.speed
-if(keys["s"]) player.y+=player.speed
-if(keys["a"]) player.x-=player.speed
-if(keys["d"]) player.x+=player.speed
+if(keys["w"]) player.vy -= player.speed
+if(keys["s"]) player.vy += player.speed
+if(keys["a"]) player.vx -= player.speed
+if(keys["d"]) player.vx += player.speed
 
-player.x=Math.max(0,Math.min(mapWidth,player.x))
-player.y=Math.max(0,Math.min(mapHeight,player.y))
+player.vx *= player.friction
+player.vy *= player.friction
+
+player.x += player.vx
+player.y += player.vy
+
+if(keys[" "] && player.dashCooldown<=0){
+player.vx *= 8
+player.vy *= 8
+player.dashCooldown = 60
+}
+
+if(player.dashCooldown>0) player.dashCooldown--
 
 }
+
+/* ======================
+CAMERA UPDATE
+====================== */
 
 function updateCamera(){
 
-camera.x=player.x-screenWidth/2
-camera.y=player.y-screenHeight/2
-
-camera.x=Math.max(0,Math.min(mapWidth-screenWidth,camera.x))
-camera.y=Math.max(0,Math.min(mapHeight-screenHeight,camera.y))
+camera.x = player.x - canvas.width/2
+camera.y = player.y - canvas.height/2
 
 }
 
-function moveEnemies(){
-
-enemies.forEach(e=>{
-
-const dx=player.x-e.x
-const dy=player.y-e.y
-const dist=Math.sqrt(dx*dx+dy*dy)
-
-if(dist>0){
-
-let speed=1.5
-if(e.type==="boss") speed=0.7
-
-e.x+=dx/dist*speed
-e.y+=dy/dist*speed
-
-}
-
-})
-
-}
+/* ======================
+BULLETS
+====================== */
 
 function updateBullets(){
 
 bullets.forEach((b,i)=>{
 
-b.x+=b.vx
-b.y+=b.vy
+b.x += b.vx
+b.y += b.vy
 
-if(b.x<0||b.x>mapWidth||b.y<0||b.y>mapHeight){
+enemies.forEach(enemy=>{
+
+const dx = b.x - enemy.x
+const dy = b.y - enemy.y
+const dist = Math.sqrt(dx*dx + dy*dy)
+
+if(dist < 20){
+
+enemy.hp -= b.damage
+
+enemy.vx += b.vx*0.3
+enemy.vy += b.vy*0.3
+
+damageTexts.push({
+x:enemy.x,
+y:enemy.y,
+value:b.damage,
+life:60
+})
 
 bullets.splice(i,1)
 
@@ -179,40 +216,63 @@ bullets.splice(i,1)
 
 })
 
-}
-
-function checkHits(){
-
-bullets.forEach(b=>{
-
-enemies.forEach(e=>{
-
-const dx=b.x-e.x
-const dy=b.y-e.y
-const dist=Math.sqrt(dx*dx+dy*dy)
-
-if(dist<e.size){
-
-e.health-=20
-
-if(e.health<=0){
-
-score+=10
-if(e.type==="boss") score+=100
-
-}
-
-}
-
 })
 
-})
+}
 
-enemies.forEach((e,i)=>{
+/* ======================
+ENEMIES
+====================== */
 
-if(e.health<=0){
+function updateEnemies(){
 
+enemies.forEach((enemy,i)=>{
+
+const dx = player.x - enemy.x
+const dy = player.y - enemy.y
+const dist = Math.sqrt(dx*dx + dy*dy)
+
+enemy.vx += (dx/dist)*0.1
+enemy.vy += (dy/dist)*0.1
+
+enemy.vx *= 0.9
+enemy.vy *= 0.9
+
+enemy.x += enemy.vx
+enemy.y += enemy.vy
+
+if(dist < 30){
+player.hp -= 0.2
+}
+
+if(enemy.hp <= 0){
+score += 10
 enemies.splice(i,1)
+}
+
+})
+
+}
+
+/* ======================
+POWERUPS
+====================== */
+
+function updatePowerups(){
+
+powerups.forEach((p,i)=>{
+
+const dx = player.x - p.x
+const dy = player.y - p.y
+const dist = Math.sqrt(dx*dx+dy*dy)
+
+if(dist < 30){
+
+if(p.type==="heal"){
+player.hp = Math.min(player.hp+30,player.maxHp)
+}
+
+powerups.splice(i,1)
 
 }
 
@@ -220,151 +280,217 @@ enemies.splice(i,1)
 
 }
 
-function nextWave(){
+/* ======================
+DAMAGE TEXT
+====================== */
 
-if(enemies.length===0){
+function updateDamage(){
 
-wave++
-spawnWave()
+damageTexts.forEach((d,i)=>{
+
+d.y -= 0.5
+d.life--
+
+if(d.life<=0) damageTexts.splice(i,1)
+
+})
 
 }
 
-}
+/* ======================
+DRAW
+====================== */
 
-function drawMap(){
+function draw(){
+
+ctx.clearRect(0,0,canvas.width,canvas.height)
+
+/* arena */
 
 ctx.fillStyle="#1a1a1a"
-ctx.fillRect(0,0,screenWidth,screenHeight)
+ctx.fillRect(0,0,canvas.width,canvas.height)
 
-}
+/* player */
 
-function drawPlayer(){
-
-ctx.drawImage(
-playerImg,
-player.x-camera.x-20,
-player.y-camera.y-20,
-40,
-40
+ctx.fillStyle="cyan"
+ctx.beginPath()
+ctx.arc(
+player.x-camera.x,
+player.y-camera.y,
+20,
+0,
+Math.PI*2
 )
+ctx.fill()
 
-}
+/* enemies */
 
-function drawEnemies(){
+enemies.forEach(enemy=>{
 
-enemies.forEach(e=>{
+ctx.fillStyle = enemy.boss ? "purple":"red"
 
-ctx.drawImage(
-enemyImg,
-e.x-camera.x-20,
-e.y-camera.y-20,
-e.size,
-e.size
+ctx.beginPath()
+ctx.arc(
+enemy.x-camera.x,
+enemy.y-camera.y,
+20,
+0,
+Math.PI*2
 )
+ctx.fill()
 
-})
+/* health bar */
 
-}
-
-function drawBullets(){
-
-ctx.fillStyle="yellow"
-
-bullets.forEach(b=>{
-
+ctx.fillStyle="black"
 ctx.fillRect(
-b.x-camera.x,
-b.y-camera.y,
-6,
+enemy.x-camera.x-20,
+enemy.y-camera.y-30,
+40,
+6
+)
+
+ctx.fillStyle="lime"
+ctx.fillRect(
+enemy.x-camera.x-20,
+enemy.y-camera.y-30,
+40*(enemy.hp/enemy.maxHp),
 6
 )
 
 })
 
-}
+/* bullets */
 
-function drawAimLine(){
+ctx.fillStyle="yellow"
 
-ctx.strokeStyle="red"
+bullets.forEach(b=>{
+
 ctx.beginPath()
-
-ctx.moveTo(
-player.x-camera.x,
-player.y-camera.y
+ctx.arc(
+b.x-camera.x,
+b.y-camera.y,
+5,
+0,
+Math.PI*2
 )
+ctx.fill()
 
-ctx.lineTo(
-mouse.x,
-mouse.y
+})
+
+/* powerups */
+
+powerups.forEach(p=>{
+
+ctx.fillStyle="green"
+
+ctx.beginPath()
+ctx.arc(
+p.x-camera.x,
+p.y-camera.y,
+10,
+0,
+Math.PI*2
 )
+ctx.fill()
 
-ctx.stroke()
+})
 
-}
-
-function drawUI(){
+/* damage numbers */
 
 ctx.fillStyle="white"
 ctx.font="16px Arial"
 
-ctx.fillText("HP: "+player.health,20,25)
-ctx.fillText("Wave: "+wave,20,45)
-ctx.fillText("Score: "+score,20,65)
-ctx.fillText("High Score: "+highScore,20,85)
+damageTexts.forEach(d=>{
+ctx.fillText(
+d.value,
+d.x-camera.x,
+d.y-camera.y
+)
+})
+
+/* UI */
+
+ctx.fillStyle="white"
+ctx.font="20px Arial"
+ctx.fillText("Score: "+score,20,30)
+ctx.fillText("Wave: "+wave,20,60)
+
+ctx.fillStyle="red"
+ctx.fillRect(20,80,200,10)
+
+ctx.fillStyle="lime"
+ctx.fillRect(20,80,200*(player.hp/player.maxHp),10)
+
+/* aiming line */
+
+ctx.strokeStyle="white"
+
+ctx.beginPath()
+ctx.moveTo(canvas.width/2,canvas.height/2)
+ctx.lineTo(mouse.x,mouse.y)
+ctx.stroke()
 
 }
 
-function gameLoop(){
+/* ======================
+GAME LOOP
+====================== */
 
-movePlayer()
-moveEnemies()
-updateBullets()
-checkHits()
-nextWave()
+function update(){
+
+updatePlayer()
 updateCamera()
-
-if(player.attackCooldown>0) player.attackCooldown--
-
-if(score>highScore){
-
-highScore=score
-localStorage.setItem("brawlHighScore",score)
+updateBullets()
+updateEnemies()
+updatePowerups()
+updateDamage()
 
 }
 
-drawMap()
-drawPlayer()
-drawEnemies()
-drawBullets()
-drawAimLine()
-drawUI()
+/* ======================
+WAVES
+====================== */
 
-requestAnimationFrame(gameLoop)
+setInterval(()=>{
+
+wave++
+
+for(let i=0;i<wave+2;i++){
+spawnEnemy()
+}
+
+if(wave % 5 === 0){
+spawnBoss()
+}
+
+if(Math.random()<0.5){
+spawnPowerup()
+}
+
+},8000)
+
+/* ======================
+MAIN LOOP
+====================== */
+
+function loop(){
+
+update()
+draw()
+
+requestAnimationFrame(loop)
 
 }
 
-gameLoop()
+loop()
 
 },[])
 
-return(
-
-<main style={{textAlign:"center"}}>
-
-<h1>Brawl Blitz</h1>
-
+return (
 <canvas
 ref={canvasRef}
-width={800}
-height={500}
-style={{
-border:"3px solid white",
-background:"black"
-}}
+style={{width:"100vw",height:"100vh"}}
 />
-
-</main>
-
 )
 
 }
