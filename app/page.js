@@ -1,7 +1,5 @@
 "use client"
 import { useRouter } from "next/navigation"
-import TopBar from "../components/TopBar"
-import PlayButton from "../components/PlayButton"
 
 export default function Home(){
 
@@ -15,31 +13,34 @@ background:"#0f0f0f",
 display:"flex",
 flexDirection:"column",
 alignItems:"center",
-justifyContent:"space-between",
-padding:"30px"
+justifyContent:"center",
+gap:"30px"
 }}>
-
-<TopBar/>
 
 <h1 style={{color:"white",fontSize:"50px"}}>
 Brawl Blitz
 </h1>
 
-<img src="/sprites/player.png" width="200"/>
-
-<div style={{display:"flex",gap:"20px"}}>
-
-<button onClick={()=>router.push("/brawlers")}>
-Brawlers
+<button
+style={{padding:"15px 40px",fontSize:"20px"}}
+onClick={()=>router.push("/game")}
+>
+Play
 </button>
 
-<button onClick={()=>router.push("/leaderboard")}>
+<button
+style={{padding:"10px 30px"}}
+onClick={()=>router.push("/leaderboard")}
+>
 Leaderboard
 </button>
 
-</div>
-
-<PlayButton/>
+<button
+style={{padding:"10px 30px"}}
+onClick={()=>router.push("/brawlers")}
+>
+Brawlers
+</button>
 
 </div>
 
