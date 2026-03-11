@@ -1,25 +1,55 @@
 "use client"
 
-export default function Leaderboard(){
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 
-const scores = JSON.parse(
-localStorage.getItem("scores") || "[]"
-)
+export default function LeaderboardPage(){
+
+const router = useRouter()
+const [scores, setScores] = useState([])
+
+useEffect(()=>{
+
+if(typeof window !== "undefined"){
+
+const saved = localStorage.getItem("leaderboard")
+
+if(saved){
+setScores(JSON.parse(saved))
+}
+
+}
+
+},[])
 
 return(
 
 <div style={{
-background:"#111",
 height:"100vh",
+background:"#111",
 color:"white",
-padding:"40px"
+display:"flex",
+flexDirection:"column",
+alignItems:"center",
+justifyContent:"center",
+gap:"20px"
 }}>
 
-<h1>Leaderboard</h1>
+<h1 style={{fontSize:"50px"}}>Leaderboard</h1>
 
-{scores.map((s,i)=>(
-<p key={i}>{i+1}. {s}</p>
-))}
+{scores.length === 0 ? (
+<p>No scores yet</p>
+) : (
+scores.map((s,i)=>(
+<div key={i}>
+{s.name} - {s.score}
+</div>
+))
+)}
+
+<button onClick={()=>router.push("/")}>
+Back Home
+</button>
 
 </div>
 
