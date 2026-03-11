@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 
-export default function ShopPage() {
+export default function Home() {
 
 const router = useRouter()
 
@@ -10,7 +10,7 @@ return (
 
 <div style={{
 height:"100vh",
-background:"#111",
+background:"#0f0f0f",
 color:"white",
 display:"flex",
 flexDirection:"column",
@@ -19,12 +19,22 @@ justifyContent:"center",
 gap:"20px"
 }}>
 
-<h1 style={{fontSize:"50px"}}>Shop</h1>
+<h1 style={{fontSize:"60px"}}>Brawl Blitz</h1>
 
-<p>Buy skins, coins, and diamonds</p>
+<button onClick={()=>router.push("/game")}>
+Play
+</button>
 
-<button onClick={()=>router.push("/")}>
-Back Home
+<button onClick={()=>router.push("/brawlers")}>
+Brawlers
+</button>
+
+<button onClick={()=>router.push("/shop")}>
+Shop
+</button>
+
+<button onClick={()=>router.push("/leaderboard")}>
+Leaderboard
 </button>
 
 </div>
